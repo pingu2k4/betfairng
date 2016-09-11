@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -6,7 +6,7 @@ using Newtonsoft.Json;
 
 namespace BetfairNG.Data
 {
-    public class RunnerDescription
+    public class RunnerCatalog
     {
         [JsonProperty(PropertyName = "selectionId")]
         public long SelectionId { get; set; }

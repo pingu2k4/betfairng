@@ -182,9 +182,10 @@ namespace BetfairNG
          public BetfairServerResponse<PlaceExecutionReport> PlaceOrders(
             string marketId, 
             IList<PlaceInstruction> placeInstructions,
-            string customerRef = null)
+            string customerRef = null,
+            MarketVersion marketVersion = null)
         {
-            return client.PlaceOrders(marketId, placeInstructions, customerRef).Result;
+            return client.PlaceOrders(marketId, placeInstructions, customerRef, marketVersion).Result;
         }
 
         public BetfairServerResponse<CancelExecutionReport> CancelOrders(
@@ -198,9 +199,10 @@ namespace BetfairNG
         public BetfairServerResponse<ReplaceExecutionReport> ReplaceOrders(
             string marketId,
             IList<ReplaceInstruction> instructions,
-            string customerRef = null)
+            string customerRef = null,
+            MarketVersion marketVersion = null)
         {
-            return client.ReplaceOrders(marketId, instructions, customerRef).Result;
+            return client.ReplaceOrders(marketId, instructions, customerRef, marketVersion).Result;
         }
 
         public BetfairServerResponse<UpdateExecutionReport> UpdateOrders(
@@ -244,6 +246,13 @@ namespace BetfairNG
         public BetfairServerResponse<TransferResponse> TransferFunds(Wallet from, Wallet to, double amount)
         {
             return client.TransferFunds(from, to, amount).Result;
+        }
+
+        public BetfairServerResponse<List<RaceDetails>> ListRaceDetails(
+            ISet<string> meetingIds,
+            ISet<string> raceIds)
+        {
+            return client.ListRaceDetails(meetingIds, raceIds).Result;
         }
     }
 }
