@@ -1,0 +1,25 @@
+<?xml version="1.0"?>
+<package>
+  <metadata>
+    <id>BetfairNG</id>
+    <version>1.0.4</version>
+    <title>BetfairNG</title>
+    <authors>csutcliff</authors>
+    <owners>csutcliff</owners>
+    <requireLicenseAcceptance>false</requireLicenseAcceptance>
+    <description>A Betfair library forked from joelpob</description>
+	<dependencies>
+	<dependency id="Newtonsoft.Json" version="9.0.1" />
+      <dependency id="System.Reactive" version="3.0.0" />
+	  <dependency id="System.Reactive.Core" version="3.0.0" />
+	  <dependency id="System.Reactive.Interfaces" version="3.0.0" />
+	  <dependency id="System.Reactive.Linq" version="3.0.0" />
+	  <dependency id="System.Reactive.PlatformServices" version="3.0.0" />
+	  <dependency id="System.Reactive.Windows.Threading" version="3.0.0" />
+	 </dependencies>
+  </metadata>
+  <files>
+  <file src="bin\Release\BetfairNG.dll" target="lib\net40\BetfairNG.dll"/>
+  </files>
+      
+</package>
