@@ -159,7 +159,7 @@ namespace BetfairNG
 
         private bool login(X509Certificate2 x509certificate, string postData)
         {
-            HttpWebRequest request = (HttpWebRequest)WebRequest.Create("https://identitysso.betfair.com/api/certlogin");
+            HttpWebRequest request = (HttpWebRequest)WebRequest.Create("https://identitysso-cert.betfair.com/api/certlogin");
             request.UseDefaultCredentials = true;
             request.Method = "POST";
             request.ContentType = "application/x-www-form-urlencoded";
