@@ -31,14 +31,21 @@ namespace BetfairNG
             client = new BetfairClient(appKey, preNetworkRequest, proxy);
         }
 
-        public bool Login(string p12CertificateLocation, string username, string password)
+        public bool Login(string p12CertificateLocation,
+        string username,
+        string password,
+        string loginURL="https://identitysso-cert.betfair.com/api/certlogin")
         {
-            return client.Login(p12CertificateLocation, username, password);
+            return client.Login(p12CertificateLocation, username, password, loginURL);
         }
 
-        public bool Login(string p12CertificateLocation, string p12CertificatePassword, string username, string password)
+        public bool Login(string p12CertificateLocation, 
+            string p12CertificatePassword,
+            string username, 
+            string password, 
+            string loginUrl="https://identitysso-cert.betfair.com/api/certlogin")
         {
-            return client.Login(p12CertificateLocation, p12CertificatePassword, username, password);
+            return client.Login(p12CertificateLocation, p12CertificatePassword, username, password, loginUrl);
         }
 
         public bool Login(X509Certificate2 p12Certificate, string username, string password)
