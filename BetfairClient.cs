@@ -113,8 +113,7 @@ namespace BetfairNG
             this.networkClient = new Network(this.appKey, this.sessionToken, this.preNetworkRequest, true, this.proxy);
         }
         
-        public bool Login(string p12CertificateLocation, 
-            string p12CertificatePassword, 
+        public bool Login(string p12CertificateLocation,
             string username, 
             string password, 
             string loginUrl="https://identitysso-cert.betfair.com/api/certlogin")
@@ -129,10 +128,13 @@ namespace BetfairNG
 
             string postData = string.Format("username={0}&password={1}", username, password);
             X509Certificate2 x509certificate = new X509Certificate2(p12CertificateLocation);
-            return login(x509certificate, postData);
+            return login(x509certificate, postData, loginUrl);
         }
 
-        public bool Login(string p12CertificateLocation, string p12CertificatePassword, string username, string password)
+        public bool Login(string p12CertificateLocation,
+            string p12CertificatePassword,
+            string username, string password,
+            string loginUrl = "https://identitysso-cert.betfair.com/api/certlogin")
         {
             if (string.IsNullOrWhiteSpace(p12CertificateLocation)) throw new ArgumentException("p12CertificateLocation");
             if (string.IsNullOrWhiteSpace(p12CertificatePassword)) throw new ArgumentException("p12CertificatePassword");
@@ -146,11 +148,15 @@ namespace BetfairNG
             string postData = string.Format("username={0}&password={1}", username, password);
             X509Certificate2 x509certificate = new X509Certificate2(p12CertificateLocation, p12CertificatePassword);
 
-            return login(x509certificate, postData);
+            return login(x509certificate, postData, loginUrl);
         }
 
-        public bool Login(X509Certificate2 x509certificate, string username, string password)
+        public bool Login(X509Certificate2 p12Certificate,
+            string username,
+            string password,
+            string loginUrl = "https://identitysso-cert.betfair.com/api/certlogin")
         {
+            if (p12Certificate == null) throw new ArgumentException("p12Certificate");
             if (string.IsNullOrWhiteSpace(username)) throw new ArgumentException("username");
             if (string.IsNullOrWhiteSpace(password)) throw new ArgumentException("password");
 
@@ -158,10 +164,11 @@ namespace BetfairNG
                 preNetworkRequest();
 
             string postData = string.Format("username={0}&password={1}", username, password);
-            return login(x509certificate, postData);
+            
+            return login(p12Certificate, postData, loginUrl);
         }
 
-        private bool login(X509Certificate2 x509certificate, string postData)
+        private bool login(X509Certificate2 x509certificate, string postData, string loginUrl)
         {
             HttpWebRequest request = (HttpWebRequest)WebRequest.Create(loginUrl);
             request.UseDefaultCredentials = true;
