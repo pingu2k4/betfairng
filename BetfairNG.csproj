@@ -4,22 +4,19 @@
     <TargetFramework>netstandard2.0</TargetFramework>
     <AssemblyVersion>1.0.2.0</AssemblyVersion>
     <FileVersion>1.0.2.0</FileVersion>
-    <Version>1.0.2.0</Version>
+    <Version>1.1.0.0</Version>
   </PropertyGroup>
 
   <ItemGroup>
     <Compile Remove="BetfairNG.ESAClient\**" />
     <Compile Remove="BetfairNG.ESASwagger\**" />
     <Compile Remove="ConsoleExample\**" />
-    <Compile Remove="stream-api-sample-code\**" />
     <EmbeddedResource Remove="BetfairNG.ESAClient\**" />
     <EmbeddedResource Remove="BetfairNG.ESASwagger\**" />
     <EmbeddedResource Remove="ConsoleExample\**" />
-    <EmbeddedResource Remove="stream-api-sample-code\**" />
     <None Remove="BetfairNG.ESAClient\**" />
     <None Remove="BetfairNG.ESASwagger\**" />
     <None Remove="ConsoleExample\**" />
-    <None Remove="stream-api-sample-code\**" />
   </ItemGroup>
 
   <ItemGroup>
@@ -28,12 +25,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Folder Include="Properties\" />
-  </ItemGroup>
-
-  <ItemGroup>
     <ProjectReference Include="BetfairNG.ESAClient\BetfairNG.ESAClient.csproj" />
-    <ProjectReference Include="BetfairNG.ESASwagger\BetfairNG.ESASwagger.csproj" />
   </ItemGroup>
 
 </Project>
