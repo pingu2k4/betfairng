@@ -4,8 +4,8 @@ using System.Collections.Concurrent;
 using System.Configuration;
 using BetfairNG;
 using BetfairNG.Data;
-using Betfair.ESAClient.Cache;
-using Betfair.ESAClient.Protocol;
+using BetfairNG.ESAClient.Cache;
+using BetfairNG.ESAClient.Protocol;
 
 // This example pulls the latest horse races in the UK markets
 // and displays them to the console.

@@ -9,7 +9,7 @@ using System.Reactive.Linq;
 using System.Reactive.Concurrency;
 using System.Collections.Concurrent;
 using BetfairNG.Data;
-using Betfair.ESAClient.Cache;
+using BetfairNG.ESAClient.Cache;
 
 namespace BetfairNG
 {
@@ -176,7 +176,7 @@ namespace BetfairNG
 
             if (marketSnap.MarketRunners != null && marketSnap.MarketRunners.Count > 0)
             {
-                foreach (var runner in marketSnap.MarketRunners.Where(c => c.Definition.Status == Betfair.ESASwagger.Model.RunnerDefinition.StatusEnum.Active))
+                foreach (var runner in marketSnap.MarketRunners.Where(c => c.Definition.Status == BetfairNG.ESASwagger.Model.RunnerDefinition.StatusEnum.Active))
                 {
                     var runnerName = runnerDescriptions != null ? runnerDescriptions.FirstOrDefault(c => c.SelectionId == runner.RunnerId.SelectionId) : null;
                     var bsString = backSide != null ? backSide(runnerName, runner) : "";
