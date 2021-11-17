@@ -2,19 +2,19 @@
 <package xmlns="http://schemas.microsoft.com/packaging/2013/05/nuspec.xsd">
   <metadata>
     <id>BetfairNG</id>
-	<version>1.1.0$version$</version>
+	<version>1.2.0$version$</version>
     <authors>BetfairNG</authors>
     <owners>BetfairNG</owners>
     <requireLicenseAcceptance>false</requireLicenseAcceptance>
     <description>A library for Betfair's API-NG</description>
     <dependencies>
-      <group targetFramework=".NETStandard2.0">
-        <dependency id="Newtonsoft.Json" version="12.0.1" exclude="Build,Analyzers" />
-        <dependency id="System.Reactive" version="4.1.3" exclude="Build,Analyzers" />
+      <group targetFramework=".NETStandard2.1">
+        <dependency id="Newtonsoft.Json" version="13.0.1" exclude="Build,Analyzers" />
+        <dependency id="System.Reactive" version="5.0.0" exclude="Build,Analyzers" />
       </group>
     </dependencies>
   </metadata>
   <files>
-    <file src="bin\Release\netstandard2.0\*.dll" target="lib\netstandard2.0\" />
+    <file src="bin\Release\netstandard2.1\*.dll" target="lib\netstandard2.1\" />
   </files>
 </package>
