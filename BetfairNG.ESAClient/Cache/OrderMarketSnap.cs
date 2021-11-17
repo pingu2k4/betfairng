@@ -1,10 +1,6 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using System.Collections.Generic;
 
-namespace BetfairNG.ESAClient.Cache
+namespace Betfair.ESAClient.Cache
 {
     /// <summary>
     /// Thread safe atomic snapshot of a market.
@@ -14,17 +10,15 @@ namespace BetfairNG.ESAClient.Cache
     /// </summary>
     public class OrderMarketSnap
     {
-        public string MarketId { get; internal set; }
         public bool IsClosed { get; internal set; }
+
+        public string MarketId { get; internal set; }
+
         public IEnumerable<OrderMarketRunnerSnap> OrderMarketRunners { get; internal set; }
 
         public override string ToString()
         {
-            return "OrderMarketSnap{" +
-                "MarketId=" + MarketId+
-                ", IsClosed=" + IsClosed +
-                ", OrderMarketRunners=" + String.Join(", ", OrderMarketRunners) +
-                "}";
+            return "OrderMarketSnap{" + "MarketId=" + MarketId + ", IsClosed=" + IsClosed + ", OrderMarketRunners=" + string.Join(", ", OrderMarketRunners) + "}";
         }
     }
 }

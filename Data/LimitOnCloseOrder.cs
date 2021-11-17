@@ -1,18 +1,15 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using Newtonsoft.Json;
+using System.Text;
 
 namespace BetfairNG.Data
 {
     public class LimitOnCloseOrder
     {
-        [JsonProperty(PropertyName = "size")]
-        public double Size { get; set; }
-
         [JsonProperty(PropertyName = "liability")]
         public double Liability { get; set; }
+
+        [JsonProperty(PropertyName = "size")]
+        public double Size { get; set; }
 
         public override string ToString()
         {

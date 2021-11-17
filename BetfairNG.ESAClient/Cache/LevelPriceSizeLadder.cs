@@ -1,10 +1,6 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using System.Collections.Generic;
 
-namespace BetfairNG.ESAClient.Cache
+namespace Betfair.ESAClient.Cache
 {
     /// <summary>
     /// A level price size ladder with copy on write snapshot
@@ -14,7 +10,8 @@ namespace BetfairNG.ESAClient.Cache
         /// <summary>
         /// Dictionary of level to LevelPriceSize
         /// </summary>
-        private readonly SortedDictionary<int, LevelPriceSize> _levelToPriceSize = new SortedDictionary<int, LevelPriceSize>();
+        private readonly SortedDictionary<int, LevelPriceSize> _levelToPriceSize = new();
+
         private IList<LevelPriceSize> _snap = LevelPriceSize.EmptyList;
 
         public IList<LevelPriceSize> OnPriceChange(bool isImage, List<List<double?>> prices)
@@ -30,7 +27,7 @@ namespace BetfairNG.ESAClient.Cache
                 //changes to apply
                 foreach (List<double?> price in prices)
                 {
-                    LevelPriceSize levelPriceSize = new LevelPriceSize(price);
+                    LevelPriceSize levelPriceSize = new(price);
                     //keep zero's in the ladder as it is fixed depth
                     _levelToPriceSize[levelPriceSize.Level] = levelPriceSize;
                 }

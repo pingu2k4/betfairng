@@ -1,12 +1,8 @@
-﻿using BetfairNG.ESASwagger.Model;
-using System;
-using System.Collections.Concurrent;
+﻿using Betfair.ESASwagger.Model;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
-namespace BetfairNG.ESAClient.Cache
+namespace Betfair.ESAClient.Cache
 {
     /// <summary>
     /// Thread safe, reference invariant reference to a market.
@@ -16,15 +12,57 @@ namespace BetfairNG.ESAClient.Cache
     {
         private readonly MarketCache _marketCache;
         private readonly string _marketId;
-        private readonly Dictionary<RunnerId, MarketRunner> _marketRunners = new Dictionary<RunnerId, MarketRunner>();
+        private readonly Dictionary<RunnerId, MarketRunner> _marketRunners = new();
         private MarketDefinition _marketDefinition;
-        private double _tv;
         private MarketSnap _snap;
+        private double _tv;
 
         public Market(MarketCache marketCache, string marketId)
         {
             _marketCache = marketCache;
             _marketId = marketId;
+        }
+
+        /// <summary>
+        /// Whether the market is closed.
+        /// </summary>
+        public bool IsClosed
+        {
+            get
+            {
+                return _marketDefinition != null && _marketDefinition.Status == MarketDefinition.StatusEnum.Closed;
+            }
+        }
+
+        /// <summary>
+        /// Market id
+        /// </summary>
+        public string MarketId
+        {
+            get
+            {
+                return _marketId;
+            }
+        }
+
+        /// <summary>
+        /// An atomic snapshot of the state of the market.
+        /// </summary>
+        public MarketSnap Snap
+        {
+            get
+            {
+                return _snap;
+            }
+        }
+
+        public override string ToString()
+        {
+            return "Market{" +
+                "MarketId=" + MarketId +
+                ", MarketDefinition=" + _marketDefinition +
+                ", MarketRunners=" + string.Join(", ", _marketRunners.Values) +
+                "}";
         }
 
         internal void OnMarketChange(MarketChange marketChange)
@@ -46,30 +84,24 @@ namespace BetfairNG.ESAClient.Cache
                 }
             }
 
-            MarketSnap newSnap = new MarketSnap();
-            newSnap.MarketId = _marketId;
-            newSnap.MarketDefinition = _marketDefinition;
-            newSnap.MarketRunners = _marketRunners.Values.Select(runner => runner.Snap).ToList();
-            newSnap.TradedVolume = Utils.SelectPrice(isImage, ref _tv, marketChange.Tv);
+            MarketSnap newSnap = new()
+            {
+                MarketId = _marketId,
+                MarketDefinition = _marketDefinition,
+                MarketRunners = _marketRunners.Values.Select(runner => runner.Snap).ToList(),
+                TradedVolume = Utils.SelectPrice(isImage, ref _tv, marketChange.Tv)
+            };
             _snap = newSnap;
         }
 
         private MarketRunner GetOrAdd(RunnerId rid)
         {
-            MarketRunner runner;
-            if (!_marketRunners.TryGetValue(rid, out runner))
+            if (!_marketRunners.TryGetValue(rid, out MarketRunner runner))
             {
                 runner = new MarketRunner(this, rid);
                 _marketRunners[rid] = runner;
             }
             return runner;
-        }
-
-        private void OnPriceChange(bool isImage, RunnerChange runnerChange)
-        {
-            MarketRunner marketRunner = GetOrAdd(new RunnerId(runnerChange.Id, runnerChange.Hc));
-            //update the runner
-            marketRunner.OnPriceChange(isImage, runnerChange);
         }
 
         private void OnMarketDefinitionChange(MarketDefinition marketDefinition)
@@ -84,53 +116,18 @@ namespace BetfairNG.ESAClient.Cache
             }
         }
 
+        private void OnPriceChange(bool isImage, RunnerChange runnerChange)
+        {
+            MarketRunner marketRunner = GetOrAdd(new RunnerId(runnerChange.Id, runnerChange.Hc));
+            //update the runner
+            marketRunner.OnPriceChange(isImage, runnerChange);
+        }
+
         private void OnRunnerDefinitionChange(RunnerDefinition runnerDefinition)
         {
             MarketRunner marketRunner = GetOrAdd(new RunnerId(runnerDefinition.Id, runnerDefinition.Hc));
             //update runner
             marketRunner.OnRunnerDefinitionChange(runnerDefinition);
-        }
-
-        /// <summary>
-        /// Market id
-        /// </summary>
-        public string MarketId
-        {
-            get
-            {
-                return _marketId;
-            }
-        }
-
-        /// <summary>
-        /// Whether the market is closed.
-        /// </summary>
-        public bool IsClosed
-        {
-            get
-            {
-                return _marketDefinition != null && _marketDefinition.Status == MarketDefinition.StatusEnum.Closed;
-            }
-        }
-
-        /// <summary>
-        /// An atomic snapshot of the state of the market.
-        /// </summary>
-        public MarketSnap Snap
-        {
-            get
-            {
-                return _snap;
-            }
-        }
-
-        public override string ToString()
-        {
-            return "Market{" +
-                "MarketId=" + MarketId +
-                ", MarketDefinition=" + _marketDefinition +
-                ", MarketRunners=" + String.Join(", ", _marketRunners.Values) +
-                "}";
         }
     }
 }

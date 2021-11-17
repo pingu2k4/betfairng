@@ -1,17 +1,13 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using System.Collections.Generic;
 
-namespace BetfairNG.ESAClient.Cache
+namespace Betfair.ESAClient.Cache
 {
     /// <summary>
     /// Atomic snap of the prices associated with a runner.
     /// </summary>
     public class MarketRunnerPrices
     {
-        public static readonly MarketRunnerPrices EMPTY = new MarketRunnerPrices()
+        public static readonly MarketRunnerPrices EMPTY = new()
         {
             AvailableToLay = PriceSize.EmptyList,
             AvailableToBack = PriceSize.EmptyList,
@@ -25,35 +21,45 @@ namespace BetfairNG.ESAClient.Cache
             BestDisplayAvailableToLay = LevelPriceSize.EmptyList,
         };
 
-        public IList<PriceSize> AvailableToLay { get; internal set; } 
         public IList<PriceSize> AvailableToBack { get; internal set; }
-        public IList<PriceSize> Traded { get; internal set; }
-        public IList<PriceSize> StartingPriceBack { get; internal set; }
-        public IList<PriceSize> StartingPriceLay { get; internal set; }
+
+        public IList<PriceSize> AvailableToLay { get; internal set; }
 
         public IList<LevelPriceSize> BestAvailableToBack { get; internal set; }
+
         public IList<LevelPriceSize> BestAvailableToLay { get; internal set; }
+
         public IList<LevelPriceSize> BestDisplayAvailableToBack { get; internal set; }
+
         public IList<LevelPriceSize> BestDisplayAvailableToLay { get; internal set; }
 
         public double LastTradedPrice { get; internal set; }
-        public double StartingPriceNear { get; internal set; }
+
+        public IList<PriceSize> StartingPriceBack { get; internal set; }
+
         public double StartingPriceFar { get; internal set; }
+
+        public IList<PriceSize> StartingPriceLay { get; internal set; }
+
+        public double StartingPriceNear { get; internal set; }
+
+        public IList<PriceSize> Traded { get; internal set; }
+
         public double TradedVolume { get; internal set; }
 
         public override string ToString()
         {
             return "MarketRunnerPrices{" +
-                "AvailableToLay=" + String.Join(", ", AvailableToLay) +
-                ", AvailableToBack=" + String.Join(", ", AvailableToBack) +
-                ", Traded=" + String.Join(", ", Traded) +
-                ", StartingPriceBack=" + String.Join(", ", StartingPriceBack) +
-                ", StartingPriceLay=" + String.Join(", ", StartingPriceLay) +
+                "AvailableToLay=" + string.Join(", ", AvailableToLay) +
+                ", AvailableToBack=" + string.Join(", ", AvailableToBack) +
+                ", Traded=" + string.Join(", ", Traded) +
+                ", StartingPriceBack=" + string.Join(", ", StartingPriceBack) +
+                ", StartingPriceLay=" + string.Join(", ", StartingPriceLay) +
 
-                ", BestAvailableToBack=" + String.Join(", ", BestAvailableToBack) +
-                ", BestAvailableToLay=" + String.Join(", ", BestAvailableToLay) +
-                ", BestDisplayAvailableToBack=" + String.Join(", ", BestDisplayAvailableToBack) +
-                ", BestDisplayAvailableToLay=" + String.Join(", ", BestDisplayAvailableToLay) +
+                ", BestAvailableToBack=" + string.Join(", ", BestAvailableToBack) +
+                ", BestAvailableToLay=" + string.Join(", ", BestAvailableToLay) +
+                ", BestDisplayAvailableToBack=" + string.Join(", ", BestDisplayAvailableToBack) +
+                ", BestDisplayAvailableToLay=" + string.Join(", ", BestDisplayAvailableToLay) +
 
                 ", LastTradedPrice=" + LastTradedPrice +
                 ", StartingPriceNear=" + StartingPriceNear +

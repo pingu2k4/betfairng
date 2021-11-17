@@ -1,11 +1,6 @@
-﻿using BetfairNG.ESASwagger.Model;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using Betfair.ESASwagger.Model;
 
-namespace BetfairNG.ESAClient.Cache
+namespace Betfair.ESAClient.Cache
 {
     /// <summary>
     /// Thread safe atomic snapshot of a market runner.
@@ -15,9 +10,11 @@ namespace BetfairNG.ESAClient.Cache
     /// </summary>
     public class MarketRunnerSnap
     {
-        public RunnerId RunnerId { get; internal set; }
         public RunnerDefinition Definition { get; internal set; }
+
         public MarketRunnerPrices Prices { get; internal set; }
+
+        public RunnerId RunnerId { get; internal set; }
 
         public override string ToString()
         {

@@ -1,42 +1,43 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using Newtonsoft.Json;
+using System;
+using System.Text;
 
 namespace BetfairNG.Data
 {
     public class Order
     {
+        [JsonProperty(PropertyName = "avgPriceMatched")]
+        public double? AvgPriceMatched { get; set; }
+
         [JsonProperty(PropertyName = "betId")]
         public string BetId { get; set; }
-
-        [JsonProperty(PropertyName = "orderType")]
-        public OrderType OrderType { get; set; }
-
-        [JsonProperty(PropertyName = "status")]
-        public OrderStatus Status { get; set; }
-
-        [JsonProperty(PropertyName = "persistenceType")]
-        public PersistenceType PersistenceType { get; set; }
-
-        [JsonProperty(PropertyName = "side")]
-        public Side Side { get; set; }
-
-        [JsonProperty(PropertyName = "price")]
-        public double Price { get; set; }
-
-        [JsonProperty(PropertyName = "size")]
-        public double Size { get; set; }
 
         [JsonProperty(PropertyName = "bspLiability")]
         public double? BspLiability { get; set; }
 
+        [JsonProperty(PropertyName = "orderType")]
+        public OrderType OrderType { get; set; }
+
+        [JsonProperty(PropertyName = "persistenceType")]
+        public PersistenceType PersistenceType { get; set; }
+
         [JsonProperty(PropertyName = "placedDate")]
         public DateTime? PlacedDate { get; set; }
 
-        [JsonProperty(PropertyName = "avgPriceMatched")]
-        public double? AvgPriceMatched { get; set; }
+        [JsonProperty(PropertyName = "price")]
+        public double Price { get; set; }
+
+        [JsonProperty(PropertyName = "side")]
+        public Side Side { get; set; }
+
+        [JsonProperty(PropertyName = "size")]
+        public double Size { get; set; }
+
+        [JsonProperty(PropertyName = "sizeCancelled")]
+        public double? SizeCancelled { get; set; }
+
+        [JsonProperty(PropertyName = "sizeLapsed")]
+        public double? SizeLapsed { get; set; }
 
         [JsonProperty(PropertyName = "sizeMatched")]
         public double? SizeMatched { get; set; }
@@ -44,14 +45,11 @@ namespace BetfairNG.Data
         [JsonProperty(PropertyName = "sizeRemaining")]
         public double? SizeRemaining { get; set; }
 
-        [JsonProperty(PropertyName = "sizeLapsed")]
-        public double? SizeLapsed { get; set; }
-
-        [JsonProperty(PropertyName = "sizeCancelled")]
-        public double? SizeCancelled { get; set; }
-
         [JsonProperty(PropertyName = "sizeVoided")]
         public double? SizeVoided { get; set; }
+
+        [JsonProperty(PropertyName = "status")]
+        public OrderStatus Status { get; set; }
 
         public override string ToString()
         {

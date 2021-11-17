@@ -1,11 +1,7 @@
-﻿using System;
+﻿using Betfair.ESASwagger.Model;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using BetfairNG.ESASwagger.Model;
 
-namespace BetfairNG.ESAClient.Cache
+namespace Betfair.ESAClient.Cache
 {
     /// <summary>
     /// Cached state of the runner
@@ -15,45 +11,15 @@ namespace BetfairNG.ESAClient.Cache
         private readonly OrderMarket _market;
         private readonly RunnerId _runnerId;
 
+        private readonly PriceSizeLadder _matchedBack = PriceSizeLadder.NewBack();
+        private readonly PriceSizeLadder _matchedLay = PriceSizeLadder.NewLay();
         private OrderMarketRunnerSnap _snap;
-        private PriceSizeLadder _matchedLay = PriceSizeLadder.NewLay();
-        private PriceSizeLadder _matchedBack = PriceSizeLadder.NewBack();
-        private Dictionary<string, Order> _unmatchedOrders = new Dictionary<string, Order>();
-
+        private readonly Dictionary<string, Order> _unmatchedOrders = new();
 
         public OrderMarketRunner(OrderMarket market, RunnerId runnerId)
         {
             _market = market;
             _runnerId = runnerId;
-        }
-
-        internal void OnOrderRunnerChange(OrderRunnerChange orderRunnerChange)
-        {
-            bool isImage = orderRunnerChange.FullImage == true;
-
-            if (isImage)
-            {
-                //image so clear down
-                _unmatchedOrders.Clear();
-            }
-
-            if(orderRunnerChange.Uo != null)
-            {
-                //have order changes
-                foreach(Order order in orderRunnerChange.Uo){
-                    _unmatchedOrders[order.Id] = order;
-                }
-            }
-
-
-            OrderMarketRunnerSnap newSnap = new OrderMarketRunnerSnap();
-            newSnap.RunnerId = _runnerId;
-            newSnap.UnmatchedOrders = new Dictionary<string, Order>(_unmatchedOrders);
-
-            newSnap.MatchedLay = _matchedLay.OnPriceChange(isImage, orderRunnerChange.Ml);
-            newSnap.MatchedBack = _matchedBack.OnPriceChange(isImage, orderRunnerChange.Mb);
-
-            _snap = newSnap;
         }
 
         public OrderMarket Market
@@ -86,6 +52,37 @@ namespace BetfairNG.ESAClient.Cache
         public override string ToString()
         {
             return _snap == null ? "null" : _snap.ToString();
+        }
+
+        internal void OnOrderRunnerChange(OrderRunnerChange orderRunnerChange)
+        {
+            bool isImage = orderRunnerChange.FullImage == true;
+
+            if (isImage)
+            {
+                //image so clear down
+                _unmatchedOrders.Clear();
+            }
+
+            if (orderRunnerChange.Uo != null)
+            {
+                //have order changes
+                foreach (Order order in orderRunnerChange.Uo)
+                {
+                    _unmatchedOrders[order.Id] = order;
+                }
+            }
+
+            OrderMarketRunnerSnap newSnap = new()
+            {
+                RunnerId = _runnerId,
+                UnmatchedOrders = new Dictionary<string, Order>(_unmatchedOrders),
+
+                MatchedLay = _matchedLay.OnPriceChange(isImage, orderRunnerChange.Ml),
+                MatchedBack = _matchedBack.OnPriceChange(isImage, orderRunnerChange.Mb)
+            };
+
+            _snap = newSnap;
         }
     }
 }

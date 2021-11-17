@@ -1,27 +1,25 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using Newtonsoft.Json;
+using System.Collections.Generic;
+using System.Text;
 
 namespace BetfairNG.Data
 {
     public class StartingPrices
     {
-        [JsonProperty(PropertyName = "nearPrice")]
-        public double NearPrice { get; set; }
-
-        [JsonProperty(PropertyName = "farPrice")]
-        public double FarPrice { get; set; }
+        [JsonProperty(PropertyName = "actualSP")]
+        public double ActualSP { get; set; }
 
         [JsonProperty(PropertyName = "backStakeTaken")]
         public List<PriceSize> BackStakeTaken { get; set; }
 
+        [JsonProperty(PropertyName = "farPrice")]
+        public double FarPrice { get; set; }
+
         [JsonProperty(PropertyName = "layLiabilityTaken")]
         public List<PriceSize> LayLiabilityTaken { get; set; }
 
-        [JsonProperty(PropertyName = "actualSP")]
-        public double ActualSP { get; set; }
+        [JsonProperty(PropertyName = "nearPrice")]
+        public double NearPrice { get; set; }
 
         public override string ToString()
         {

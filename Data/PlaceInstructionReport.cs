@@ -1,15 +1,16 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using Newtonsoft.Json;
+using System;
+using System.Text;
 
 namespace BetfairNG.Data
 {
     public class PlaceInstructionReport
     {
-        [JsonProperty(PropertyName = "status")]
-        public InstructionReportStatus Status { get; set; }
+        [JsonProperty(PropertyName = "averagePriceMatched")]
+        public double? AveragePriceMatched { get; set; }
+
+        [JsonProperty(PropertyName = "betId")]
+        public string BetId { get; set; }
 
         [JsonProperty(PropertyName = "errorCode")]
         public InstructionReportErrorCode ErrorCode { get; set; }
@@ -17,17 +18,14 @@ namespace BetfairNG.Data
         [JsonProperty(PropertyName = "instruction")]
         public PlaceInstruction Instruction { get; set; }
 
-        [JsonProperty(PropertyName = "betId")]
-        public string BetId { get; set; }
-
         [JsonProperty(PropertyName = "placedDate")]
         public DateTime? PlacedDate { get; set; }
 
-        [JsonProperty(PropertyName = "averagePriceMatched")]
-        public double? AveragePriceMatched { get; set; }
-
         [JsonProperty(PropertyName = "sizeMatched")]
         public double? SizeMatched { get; set; }
+
+        [JsonProperty(PropertyName = "status")]
+        public InstructionReportStatus Status { get; set; }
 
         public override string ToString()
         {

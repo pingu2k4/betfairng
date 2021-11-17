@@ -1,21 +1,14 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using Newtonsoft.Json;
-using System.Net;
-using System.IO;
-using System.Diagnostics;
-using Newtonsoft.Json.Linq;
-using BetfairNG.ESAClient;
-using BetfairNG.ESASwagger.Model;
-using BetfairNG.ESAClient.Auth;
-using BetfairNG.ESAClient.Cache;
-using BetfairNG.ESAClient.Protocol;
+﻿using Betfair.ESAClient;
+using Betfair.ESAClient.Auth;
+using Betfair.ESAClient.Cache;
+using Betfair.ESAClient.Protocol;
+using Betfair.ESASwagger.Model;
+using System;
 using System.Collections.Concurrent;
-using System.Reactive.Linq;
+using System.Collections.Generic;
+using System.Diagnostics;
 using System.Reactive.Disposables;
+using System.Reactive.Linq;
 
 namespace BetfairNG
 {
@@ -24,25 +17,27 @@ namespace BetfairNG
     /// </summary>
     public class StreamingBetfairClient : IChangeMessageHandler
     {
-        private string streamEndPointHostName;
-        private string appKey;
-        private Client networkClient;
-        
-        private Action preNetworkRequest;
-        private static TraceSource trace = new TraceSource("StreamingBetfairClient");
+        private static readonly TraceSource trace = new TraceSource("StreamingBetfairClient");
+        private readonly string appKey;
+        private readonly MarketCache marketCache = new MarketCache();
 
-        private ConcurrentDictionary<string, IObservable<MarketSnap>> marketsObservables =
-            new ConcurrentDictionary<string, IObservable<MarketSnap>>();
-        private ConcurrentDictionary<string, IObserver<MarketSnap>> marketObservers =
+        private readonly ConcurrentDictionary<string, IObserver<MarketSnap>> marketObservers =
             new ConcurrentDictionary<string, IObserver<MarketSnap>>();
 
-        private ConcurrentDictionary<string, IObservable<OrderMarketSnap>> orderObservables =
+        private readonly ConcurrentDictionary<string, IObservable<MarketSnap>> marketsObservables =
+            new ConcurrentDictionary<string, IObservable<MarketSnap>>();
+
+        private readonly OrderCache orderCache = new OrderCache();
+
+        private readonly ConcurrentDictionary<string, IObservable<OrderMarketSnap>> orderObservables =
             new ConcurrentDictionary<string, IObservable<OrderMarketSnap>>();
-        private ConcurrentDictionary<string, IObserver<OrderMarketSnap>> orderObservers =
+
+        private readonly ConcurrentDictionary<string, IObserver<OrderMarketSnap>> orderObservers =
             new ConcurrentDictionary<string, IObserver<OrderMarketSnap>>();
 
-        MarketCache marketCache = new MarketCache();
-        OrderCache orderCache = new OrderCache();
+        private readonly Action preNetworkRequest;
+        private readonly string streamEndPointHostName;
+        private Client networkClient;
 
         public StreamingBetfairClient(
             string streamEndPointHostName,
@@ -58,97 +53,6 @@ namespace BetfairNG
 
             this.marketCache.MarketChanged += MarketCache_MarketChanged;
             this.orderCache.OrderMarketChanged += OrderCache_OrderMarketChanged;
-        }
-
-        public bool Login(string username, string password, string ssoHostName = "identitysso.betfair.com")
-        {
-            AppKeyAndSessionProvider authProvider = new AppKeyAndSessionProvider(ssoHostName, appKey, username, password);
-            networkClient = new Client(streamEndPointHostName, 443, authProvider);
-            networkClient.ChangeHandler = this;
-            networkClient.Start();
-
-            return true;
-        }
-
-        public IObservable<MarketSnap> SubscribeMarket(string marketId)
-        {
-            MarketFilter filter = new MarketFilter { MarketIds = new List<string>() { marketId } };
-            MarketSubscriptionMessage message = new MarketSubscriptionMessage() { MarketFilter = filter };
-            return SubscribeMarket(marketId, message);
-        }
-
-        public IObservable<MarketSnap> SubscribeMarket(string marketId, MarketSubscriptionMessage message)
-        {
-            networkClient.Start();
-
-            IObservable<MarketSnap> market;
-            if (marketsObservables.TryGetValue(marketId, out market))
-            {
-                networkClient.MarketSubscription(message);
-                return market;
-            }
-
-            var observable = Observable.Create<MarketSnap>(
-               (IObserver<MarketSnap> observer) =>
-               {
-                   marketObservers.AddOrUpdate(marketId, observer, (key, existingVal) => existingVal);
-                   return Disposable.Create(() =>
-                   {
-                       IObserver<MarketSnap> ob;
-                       IObservable<MarketSnap> o;
-                       marketsObservables.TryRemove(marketId, out o);
-                       marketObservers.TryRemove(marketId, out ob);
-                   });
-               })
-               .Publish()
-               .RefCount();
-
-            marketsObservables.AddOrUpdate(marketId, observable, (key, existingVal) => existingVal);
-
-            // TODO:// race? 
-            networkClient.MarketSubscription(message);
-            return observable;
-        }
-
-
-        public IObservable<OrderMarketSnap> SubscribeOrders(string marketId)
-        {
-            OrderSubscriptionMessage orderSubscription = new OrderSubscriptionMessage();
-            return SubscribeOrders(marketId, orderSubscription);
-        }
-
-        public IObservable<OrderMarketSnap> SubscribeOrders(string marketId, OrderSubscriptionMessage orderSubscription)
-        {
-            networkClient.Start();
-
-            IObservable<OrderMarketSnap> orderObservable;
-            if (orderObservables.TryGetValue(marketId, out orderObservable))
-            {
-                networkClient.OrderSubscription(orderSubscription);
-                return orderObservable;
-            }
-
-            var observable = Observable.Create<OrderMarketSnap>(
-               (IObserver<OrderMarketSnap> observer) =>
-               {
-                   orderObservers.AddOrUpdate(marketId, observer, (key, existingVal) => existingVal);
-
-                   return Disposable.Create(() =>
-                   {
-                       IObserver<OrderMarketSnap> ob;
-                       IObservable<OrderMarketSnap> o;
-                       orderObservables.TryRemove(marketId, out o);
-                       orderObservers.TryRemove(marketId, out ob);
-                   });
-               })
-               .Publish()
-               .RefCount();
-
-            orderObservables.AddOrUpdate(marketId, observable, (key, existingVal) => existingVal);
-
-            // TODO:// race? 
-            networkClient.OrderSubscription(orderSubscription);
-            return observable;
         }
 
         public long? ConflatMs
@@ -171,9 +75,21 @@ namespace BetfairNG
             }
         }
 
-        public void OnOrderChange(ChangeMessage<OrderMarketChange> changeMessage)
+        public bool Login(string username, string password, string ssoHostName = "identitysso.betfair.com")
         {
-            orderCache.OnOrderChange(changeMessage);
+            AppKeyAndSessionProvider authProvider = new AppKeyAndSessionProvider(ssoHostName, appKey, username, password);
+            networkClient = new Client(streamEndPointHostName, 443, authProvider)
+            {
+                ChangeHandler = this
+            };
+            networkClient.Start();
+
+            return true;
+        }
+
+        public void OnErrorStatusNotification(StatusMessage message)
+        {
+            // TODO:// sort this out
         }
 
         public void OnMarketChange(ChangeMessage<MarketChange> changeMessage)
@@ -181,15 +97,88 @@ namespace BetfairNG
             marketCache.OnMarketChange(changeMessage);
         }
 
-        public void OnErrorStatusNotification(StatusMessage message)
+        public void OnOrderChange(ChangeMessage<OrderMarketChange> changeMessage)
         {
-            // TODO:// sort this out 
+            orderCache.OnOrderChange(changeMessage);
+        }
+
+        public IObservable<MarketSnap> SubscribeMarket(string marketId)
+        {
+            MarketFilter filter = new MarketFilter { MarketIds = new List<string>() { marketId } };
+            MarketSubscriptionMessage message = new MarketSubscriptionMessage() { MarketFilter = filter };
+            return SubscribeMarket(marketId, message);
+        }
+
+        public IObservable<MarketSnap> SubscribeMarket(string marketId, MarketSubscriptionMessage message)
+        {
+            networkClient.Start();
+
+            if (marketsObservables.TryGetValue(marketId, out IObservable<MarketSnap> market))
+            {
+                networkClient.MarketSubscription(message);
+                return market;
+            }
+
+            var observable = Observable.Create<MarketSnap>(
+               (IObserver<MarketSnap> observer) =>
+               {
+                   marketObservers.AddOrUpdate(marketId, observer, (key, existingVal) => existingVal);
+                   return Disposable.Create(() =>
+                   {
+                       marketsObservables.TryRemove(marketId, out IObservable<MarketSnap> o);
+                       marketObservers.TryRemove(marketId, out IObserver<MarketSnap> ob);
+                   });
+               })
+               .Publish()
+               .RefCount();
+
+            marketsObservables.AddOrUpdate(marketId, observable, (key, existingVal) => existingVal);
+
+            // TODO:// race?
+            networkClient.MarketSubscription(message);
+            return observable;
+        }
+
+        public IObservable<OrderMarketSnap> SubscribeOrders(string marketId)
+        {
+            OrderSubscriptionMessage orderSubscription = new OrderSubscriptionMessage();
+            return SubscribeOrders(marketId, orderSubscription);
+        }
+
+        public IObservable<OrderMarketSnap> SubscribeOrders(string marketId, OrderSubscriptionMessage orderSubscription)
+        {
+            networkClient.Start();
+
+            if (orderObservables.TryGetValue(marketId, out IObservable<OrderMarketSnap> orderObservable))
+            {
+                networkClient.OrderSubscription(orderSubscription);
+                return orderObservable;
+            }
+
+            var observable = Observable.Create<OrderMarketSnap>(
+               (IObserver<OrderMarketSnap> observer) =>
+               {
+                   orderObservers.AddOrUpdate(marketId, observer, (key, existingVal) => existingVal);
+
+                   return Disposable.Create(() =>
+                   {
+                       orderObservables.TryRemove(marketId, out IObservable<OrderMarketSnap> o);
+                       orderObservers.TryRemove(marketId, out IObserver<OrderMarketSnap> ob);
+                   });
+               })
+               .Publish()
+               .RefCount();
+
+            orderObservables.AddOrUpdate(marketId, observable, (key, existingVal) => existingVal);
+
+            // TODO:// race?
+            networkClient.OrderSubscription(orderSubscription);
+            return observable;
         }
 
         private void MarketCache_MarketChanged(object sender, MarketChangedEventArgs e)
         {
-            IObserver<MarketSnap> o;
-            if (marketObservers.TryGetValue(e.Market.MarketId, out o))
+            if (marketObservers.TryGetValue(e.Market.MarketId, out IObserver<MarketSnap> o))
             {
                 // check to see if the market is finished
                 if (e.Market.IsClosed)
@@ -201,8 +190,7 @@ namespace BetfairNG
 
         private void OrderCache_OrderMarketChanged(object sender, OrderMarketChangedEventArgs e)
         {
-            IObserver<OrderMarketSnap> o;
-            if (orderObservers.TryGetValue(e.Snap.MarketId, out o))
+            if (orderObservers.TryGetValue(e.Snap.MarketId, out IObserver<OrderMarketSnap> o))
             {
                 // check to see if the market is finished
                 if (e.Snap.IsClosed)

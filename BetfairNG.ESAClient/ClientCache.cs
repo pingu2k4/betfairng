@@ -1,13 +1,9 @@
-﻿using BetfairNG.ESAClient.Cache;
-using BetfairNG.ESAClient.Protocol;
-using System;
+﻿using Betfair.ESAClient.Cache;
+using Betfair.ESAClient.Protocol;
+using Betfair.ESASwagger.Model;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using BetfairNG.ESASwagger.Model;
 
-namespace BetfairNG.ESAClient
+namespace Betfair.ESAClient
 {
     /// <summary>
     /// Simple ESA Cache implementation that wraps an ESA Client
@@ -15,9 +11,9 @@ namespace BetfairNG.ESAClient
     /// </summary>
     public class ClientCache : IChangeMessageHandler
     {
-        private readonly MarketCache _marketCache = new MarketCache();
-        private readonly OrderCache _orderCache = new OrderCache();
         private readonly Client _client;
+        private readonly MarketCache _marketCache = new();
+        private readonly OrderCache _orderCache = new();
 
         /// <summary>
         /// Construct a new cache to consume from / wrap the specified client.
@@ -41,30 +37,29 @@ namespace BetfairNG.ESAClient
         }
 
         /// <summary>
-        /// The underlying Client status
+        /// Set a common requested conflation rate (this slows rate of changes down) in milliseconds.
         /// </summary>
-        public ConnectionStatus Status
+        public long? ConflatMs
         {
             get
             {
-                return _client.Status;
+                return _client.ConflateMs;
             }
-        }
-            
-        /// <summary>
-        /// Explicitly start the client (otherwise this is automatic on first subscribe).
-        /// </summary>
-        public void Start()
-        {
-            _client.Start();
+            set
+            {
+                _client.ConflateMs = value;
+            }
         }
 
         /// <summary>
-        /// Explicitly stop the client
+        /// The cache of all subscribed markets
         /// </summary>
-        public void Stop()
+        public MarketCache MarketCache
         {
-            _client.Stop();
+            get
+            {
+                return _marketCache;
+            }
         }
 
         /// <summary>
@@ -83,36 +78,41 @@ namespace BetfairNG.ESAClient
         }
 
         /// <summary>
-        /// Set a common requested conflation rate (this slows rate of changes down) in milliseconds.
+        /// The cache of all subscribed orders
         /// </summary>
-        public long? ConflatMs
+        public OrderCache OrderCache
         {
             get
             {
-                return _client.ConflateMs;
-            }
-            set
-            {
-                _client.ConflateMs = value;
+                return _orderCache;
             }
         }
 
         /// <summary>
-        /// Subscribe to all orders. (starting the client if needed).
+        /// The underlying Client status
         /// </summary>
-        public void SubscribeOrders()
+        public ConnectionStatus Status
         {
-            SubscribeOrders(new OrderSubscriptionMessage());
+            get
+            {
+                return _client.Status;
+            }
         }
 
         /// <summary>
-        /// Explict order subscription. (starting the client if needed).
+        /// Explicitly start the client (otherwise this is automatic on first subscribe).
         /// </summary>
-        /// <param name="subscription"></param>
-        public void SubscribeOrders(OrderSubscriptionMessage subscription)
+        public void Start()
         {
             _client.Start();
-            _client.OrderSubscription(subscription);
+        }
+
+        /// <summary>
+        /// Explicitly stop the client
+        /// </summary>
+        public void Stop()
+        {
+            _client.Stop();
         }
 
         /// <summary>
@@ -147,29 +147,26 @@ namespace BetfairNG.ESAClient
         }
 
         /// <summary>
-        /// The cache of all subscribed markets
+        /// Subscribe to all orders. (starting the client if needed).
         /// </summary>
-        public MarketCache MarketCache
+        public void SubscribeOrders()
         {
-            get
-            {
-                return _marketCache;
-            }
+            SubscribeOrders(new OrderSubscriptionMessage());
         }
 
         /// <summary>
-        /// The cache of all subscribed orders
+        /// Explict order subscription. (starting the client if needed).
         /// </summary>
-        public OrderCache OrderCache
+        /// <param name="subscription"></param>
+        public void SubscribeOrders(OrderSubscriptionMessage subscription)
         {
-            get
-            {
-                return _orderCache;
-            }
+            _client.Start();
+            _client.OrderSubscription(subscription);
         }
 
-
-        #region IChangeMessageHandler
+        void IChangeMessageHandler.OnErrorStatusNotification(StatusMessage message)
+        {
+        }
 
         void IChangeMessageHandler.OnMarketChange(ChangeMessage<MarketChange> change)
         {
@@ -180,13 +177,5 @@ namespace BetfairNG.ESAClient
         {
             _orderCache.OnOrderChange(change);
         }
-
-        void IChangeMessageHandler.OnErrorStatusNotification(StatusMessage message)
-        {
-
-        }
-
-        #endregion
-
     }
 }

@@ -1,16 +1,13 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
-namespace BetfairNG.ESAClient.Protocol
+namespace Betfair.ESAClient.Protocol
 {
     /// <summary>
     /// Adapted version of a change message.
     /// </summary>
     /// <typeparam name="T"></typeparam>
-    public class ChangeMessage <T>
+    public class ChangeMessage<T>
     {
         private readonly DateTime _arrivalTime;
 
@@ -19,23 +16,37 @@ namespace BetfairNG.ESAClient.Protocol
             _arrivalTime = DateTime.UtcNow;
         }
 
-        public long? Pt { get; set; }
+        public DateTime ArrivalTime
+        {
+            get
+            {
+                return _arrivalTime;
+            }
+        }
 
-        public int Id { get; set; }
+        public ChangeType ChangeType { get; set; }
 
         public string Clk { get; set; }
 
-        public string InitialClk { get; set; }
+        public long? ConflateMs { get; set; }
 
         public long? HeartbeatMs { get; set; }
 
-        public long? ConflateMs { get; set; }
+        public int Id { get; set; }
 
-        public List<T> Items { get; set; }
+        public string InitialClk { get; set; }
 
-        public SegmentType SegmentType { get; set; }
-
-        public ChangeType ChangeType { get; set; }
+        /// <summary>
+        /// End of subscription / resubscription
+        /// </summary>
+        public bool IsEndOfRecovery
+        {
+            get
+            {
+                return (ChangeType == ChangeType.SUB_IMAGE || ChangeType == ChangeType.RESUB_DELTA) &&
+                    (SegmentType == SegmentType.NONE || SegmentType == SegmentType.SEG_END);
+            }
+        }
 
         /// <summary>
         /// Start of new subscription (not resubscription)
@@ -44,7 +55,7 @@ namespace BetfairNG.ESAClient.Protocol
         {
             get
             {
-                return ChangeType == ChangeType.SUB_IMAGE && 
+                return ChangeType == ChangeType.SUB_IMAGE &&
                     (SegmentType == SegmentType.NONE || SegmentType == SegmentType.SEG_START);
             }
         }
@@ -61,24 +72,10 @@ namespace BetfairNG.ESAClient.Protocol
             }
         }
 
-        /// <summary>
-        /// End of subscription / resubscription
-        /// </summary>
-        public bool IsEndOfRecovery
-        {
-            get
-            {
-                return (ChangeType == ChangeType.SUB_IMAGE || ChangeType == ChangeType.RESUB_DELTA) &&
-                    (SegmentType == SegmentType.NONE || SegmentType == SegmentType.SEG_END);
-            }
-        }
+        public List<T> Items { get; set; }
 
-        public DateTime ArrivalTime
-        {
-            get
-            {
-                return _arrivalTime;
-            }
-        }
+        public long? Pt { get; set; }
+
+        public SegmentType SegmentType { get; set; }
     }
 }

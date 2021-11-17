@@ -1,58 +1,61 @@
-﻿using System;
+﻿using BetfairNG;
+using BetfairNG.Data;
+using System;
 using System.Collections.Concurrent;
 using System.Reactive.Concurrency;
 using System.Reactive.Linq;
-using BetfairNG;
-using BetfairNG.Data;
 
-public class PeriodicExample : IDisposable
+namespace ConsoleExample
 {
-    private readonly ConcurrentQueue<MarketCatalogue> _markets = new ConcurrentQueue<MarketCatalogue>();
-    private readonly MarketListenerPeriodic _marketListener;
-
-    private IDisposable _marketSubscription;
-    public bool IsBlocking { get { return false; } }
-
-    public PeriodicExample(BetfairClient client, double pollIntervalInSeconds)
+    public class PeriodicExample : IDisposable
     {
-        var betfairClient = client;
+        private readonly MarketListenerPeriodic _marketListener;
+        private readonly ConcurrentQueue<MarketCatalogue> _markets = new();
+        private IDisposable _marketSubscription;
 
-        var marketCatalogues = betfairClient.ListMarketCatalogue(
-            BFHelpers.HorseRaceFilter("GB"),
-            BFHelpers.HorseRaceProjection(),
-            MarketSort.FIRST_TO_START,
-            25).Result.Response;
-
-        marketCatalogues.ForEach(c =>
+        public PeriodicExample(BetfairClient client, double pollIntervalInSeconds)
         {
-            _markets.Enqueue(c);
-        });
+            var betfairClient = client;
 
-        _marketListener = MarketListenerPeriodic.Create(betfairClient
-                                                        , BFHelpers.HorseRacePriceProjection()
-                                                        ,pollIntervalInSeconds);
-    }
+            var marketCatalogues = betfairClient.ListMarketCatalogue(
+                BFHelpers.HorseRaceFilter("GB"),
+                BFHelpers.HorseRaceProjection(),
+                MarketSort.FIRST_TO_START,
+                25).Result.Response;
 
-    public void Go()
-    {
-        MarketCatalogue marketCatalogue;
-        _markets.TryDequeue(out marketCatalogue);
+            marketCatalogues.ForEach(c =>
+            {
+                _markets.Enqueue(c);
+            });
 
-        _marketSubscription = _marketListener.SubscribeMarketBook(marketCatalogue.MarketId)
-            .SubscribeOn(Scheduler.Default)
-            .Subscribe(
-                tick =>
-                {
-                    Console.WriteLine(BFHelpers.MarketBookConsole(marketCatalogue, tick, marketCatalogue.Runners));
-                },
-                () =>
-                {
-                    Console.WriteLine("Market finished");
-                });
-    }
+            _marketListener = MarketListenerPeriodic.Create(betfairClient
+                                                            , BFHelpers.HorseRacePriceProjection()
+                                                            , pollIntervalInSeconds);
+        }
 
-    public void Dispose()
-    {
-        _marketSubscription.Dispose();
+        public static bool IsBlocking
+        { get { return false; } }
+
+        public void Dispose()
+        {
+            _marketSubscription.Dispose();
+        }
+
+        public void Go()
+        {
+            _markets.TryDequeue(out MarketCatalogue marketCatalogue);
+
+            _marketSubscription = _marketListener.SubscribeMarketBook(marketCatalogue.MarketId)
+                .SubscribeOn(Scheduler.Default)
+                .Subscribe(
+                    tick =>
+                    {
+                        Console.WriteLine(BFHelpers.MarketBookConsole(marketCatalogue, tick, marketCatalogue.Runners));
+                    },
+                    () =>
+                    {
+                        Console.WriteLine("Market finished");
+                    });
+        }
     }
 }

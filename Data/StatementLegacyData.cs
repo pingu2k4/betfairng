@@ -1,24 +1,21 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using Newtonsoft.Json;
+﻿using Newtonsoft.Json;
+using System;
 
 namespace BetfairNG.Data
 {
-    public class StatementLegacyData 
+    public class StatementLegacyData
     {
         [JsonProperty(PropertyName = "avgPrice")]
         public double AveragePrice { get; set; }
+
+        [JsonProperty(PropertyName = "betCategoryType")]
+        public string BetCategoryType { get; set; }
 
         [JsonProperty(PropertyName = "betSize")]
         public double BetSize { get; set; }
 
         [JsonProperty(PropertyName = "betType")]
         public string BetType { get; set; }
-
-        [JsonProperty(PropertyName = "betCategoryType")]
-        public string BetCategoryType { get; set; }
 
         [JsonProperty(PropertyName = "commissionRate")]
         public string CommissionRate { get; set; }
@@ -53,11 +50,11 @@ namespace BetfairNG.Data
         [JsonProperty(PropertyName = "startDate")]
         public DateTime StartDate { get; set; }
 
-        [JsonProperty(PropertyName = "transactionType")]
-        public string TransactionType { get; set; }
-
         [JsonProperty(PropertyName = "transactionId")]
         public long TransactionId { get; set; }
+
+        [JsonProperty(PropertyName = "transactionType")]
+        public string TransactionType { get; set; }
 
         [JsonProperty(PropertyName = "winLose")]
         public string WinLose { get; set; }

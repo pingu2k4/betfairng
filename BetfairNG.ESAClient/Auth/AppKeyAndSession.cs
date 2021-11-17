@@ -1,10 +1,6 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
-namespace BetfairNG.ESAClient.Auth
+namespace Betfair.ESAClient.Auth
 {
     /// <summary>
     /// Wraps an appkey & it's current session
@@ -19,7 +15,9 @@ namespace BetfairNG.ESAClient.Auth
         }
 
         public string AppKey { get; private set; }
+
         public DateTime CreateTime { get; private set; }
+
         public string Session { get; private set; }
     }
 }

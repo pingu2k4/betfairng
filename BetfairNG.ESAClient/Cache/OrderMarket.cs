@@ -1,21 +1,17 @@
-﻿using System;
-using System.Collections.Concurrent;
+﻿using Betfair.ESASwagger.Model;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using BetfairNG.ESASwagger.Model;
 
-namespace BetfairNG.ESAClient.Cache
+namespace Betfair.ESAClient.Cache
 {
     /// <summary>
     /// The cached state of the market
     /// </summary>
     public class OrderMarket
     {
-        private readonly OrderCache _orderCache;
         private readonly string _marketId;
-        private readonly Dictionary<RunnerId, OrderMarketRunner> _marketRunners = new Dictionary<RunnerId, OrderMarketRunner>();
+        private readonly Dictionary<RunnerId, OrderMarketRunner> _marketRunners = new();
+        private readonly OrderCache _orderCache;
         private OrderMarketSnap _snap;
 
         public OrderMarket(OrderCache orderCache, string marketId)
@@ -24,11 +20,41 @@ namespace BetfairNG.ESAClient.Cache
             _marketId = marketId;
         }
 
-        internal void OnOrderMarketChange(OrderMarketChange orderMarketChange)
-        {            
+        public bool IsClosed { get; private set; }
 
-            OrderMarketSnap newSnap = new OrderMarketSnap();
-            newSnap.MarketId = _marketId;
+        public string MarketId
+        {
+            get
+            {
+                return _marketId;
+            }
+        }
+
+        /// <summary>
+        /// Takes or returns an existing immutable snap of the market.
+        /// </summary>
+        public OrderMarketSnap Snap
+        {
+            get
+            {
+                return _snap;
+            }
+        }
+
+        public override string ToString()
+        {
+            return "OrderMarket{" +
+                "MarketId=" + MarketId +
+                ", Runners=" + string.Join(", ", _marketRunners.Values) +
+                "}";
+        }
+
+        internal void OnOrderMarketChange(OrderMarketChange orderMarketChange)
+        {
+            OrderMarketSnap newSnap = new()
+            {
+                MarketId = _marketId
+            };
 
             //update runners
             if (orderMarketChange.Orc != null)
@@ -50,9 +76,8 @@ namespace BetfairNG.ESAClient.Cache
 
         private void OnOrderRunnerChange(OrderRunnerChange orderRunnerChange)
         {
-            RunnerId rid = new RunnerId(orderRunnerChange.Id, orderRunnerChange.Hc);
-            OrderMarketRunner orderMarketRunner;
-            if (!_marketRunners.TryGetValue(rid, out orderMarketRunner))
+            RunnerId rid = new(orderRunnerChange.Id, orderRunnerChange.Hc);
+            if (!_marketRunners.TryGetValue(rid, out OrderMarketRunner orderMarketRunner))
             {
                 orderMarketRunner = new OrderMarketRunner(this, rid);
                 _marketRunners[rid] = orderMarketRunner;
@@ -60,35 +85,5 @@ namespace BetfairNG.ESAClient.Cache
             //update the runner
             orderMarketRunner.OnOrderRunnerChange(orderRunnerChange);
         }
-
-        public string MarketId
-        {
-            get
-            {
-                return _marketId;
-            }
-        }
-
-        public bool IsClosed { get; private set; }
-
-        /// <summary>
-        /// Takes or returns an existing immutable snap of the market.
-        /// </summary>
-        public OrderMarketSnap Snap
-        {
-            get
-            {
-                return _snap;
-            }
-        }
-
-        public override string ToString()
-        {
-            return "OrderMarket{" +
-                "MarketId=" + MarketId +
-                ", Runners=" + String.Join(", ", _marketRunners.Values) +
-                "}";
-        }
-
     }
 }

@@ -1,15 +1,9 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace BetfairNG.ESAClient.Cache
+﻿namespace Betfair.ESAClient.Cache
 {
-    public class RunnerId 
+    public class RunnerId
     {
-        private readonly long _selectionId;
         private readonly double? _handicap;
+        private readonly long _selectionId;
 
         public RunnerId(long? selectionId, double? handicap)
         {
@@ -17,19 +11,19 @@ namespace BetfairNG.ESAClient.Cache
             _handicap = handicap;
         }
 
-        public long SelectionId
-        {
-            get
-            {
-                return _selectionId;
-            }
-        }
-
         public double? Handicap
         {
             get
             {
                 return _handicap;
+            }
+        }
+
+        public long SelectionId
+        {
+            get
+            {
+                return _selectionId;
             }
         }
 

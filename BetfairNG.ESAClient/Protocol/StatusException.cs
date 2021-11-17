@@ -1,11 +1,7 @@
-﻿using BetfairNG.ESASwagger.Model;
+﻿using Betfair.ESASwagger.Model;
 using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
-namespace BetfairNG.ESAClient.Protocol
+namespace Betfair.ESAClient.Protocol
 {
     /// <summary>
     /// Exception used by api to raise a status fail.

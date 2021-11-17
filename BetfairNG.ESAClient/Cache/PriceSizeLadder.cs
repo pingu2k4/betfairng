@@ -1,10 +1,6 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using System.Collections.Generic;
 
-namespace BetfairNG.ESAClient.Cache
+namespace Betfair.ESAClient.Cache
 {
     /// <summary>
     /// A price size ladder with copy on write snapshot
@@ -18,8 +14,13 @@ namespace BetfairNG.ESAClient.Cache
         /// Dictionary of price to PriceSize.
         /// </summary>
         private readonly SortedDictionary<double, PriceSize> _priceToSize;
+
         private IList<PriceSize> _snap = PriceSize.EmptyList;
 
+        private PriceSizeLadder(IComparer<double> comparer)
+        {
+            _priceToSize = new SortedDictionary<double, PriceSize>(comparer);
+        }
 
         public static PriceSizeLadder NewBack()
         {
@@ -29,11 +30,6 @@ namespace BetfairNG.ESAClient.Cache
         public static PriceSizeLadder NewLay()
         {
             return new PriceSizeLadder(LAY_ORDER);
-        }
-
-        private PriceSizeLadder(IComparer<double> comparer)
-        {
-            _priceToSize = new SortedDictionary<double, PriceSize>(comparer);
         }
 
         public IList<PriceSize> OnPriceChange(bool isImage, List<List<double?>> prices)
@@ -48,7 +44,7 @@ namespace BetfairNG.ESAClient.Cache
                 //changes to apply
                 foreach (List<double?> price in prices)
                 {
-                    PriceSize priceSize = new PriceSize(price);
+                    PriceSize priceSize = new(price);
                     if (priceSize.Size == 0.0)
                     {
                         //zero signifies remove
@@ -68,6 +64,5 @@ namespace BetfairNG.ESAClient.Cache
             }
             return _snap;
         }
-
     }
 }

@@ -1,31 +1,91 @@
-﻿using BetfairNG.ESAClient.Protocol;
-using BetfairNG.ESASwagger.Model;
+﻿using Betfair.ESAClient.Protocol;
+using Betfair.ESASwagger.Model;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
-namespace BetfairNG.ESAClient.Cache
+namespace Betfair.ESAClient.Cache
 {
+    public delegate void BatchMarketsChangedEventHandler(object sender, BatchMarketsChangedEventArgs e);
+
+    public delegate void MarketChangedEventHandler(object sender, MarketChangedEventArgs e);
+
+    public class BatchMarketsChangedEventArgs : EventArgs
+    {
+        public IList<MarketChangedEventArgs> Changes { get; internal set; }
+    }
+
     /// <summary>
     /// Thread safe cache of markets
     /// </summary>
     public class MarketCache
     {
-        private readonly ConcurrentDictionary<string, Market> _markets = new ConcurrentDictionary<string, Market>();
-        
+        private readonly ConcurrentDictionary<string, Market> _markets = new();
+
         public MarketCache()
         {
             IsMarketRemovedOnClose = true;
         }
 
         /// <summary>
+        /// Event for each batch of market changes
+        /// (note to be truly atomic you will want to set to merge segments
+        /// otherwise an event could be segmented)
+        /// </summary>
+        public event BatchMarketsChangedEventHandler BatchMarketsChanged;
+
+        /// <summary>
+        /// Event for each market change
+        /// </summary>
+        public event MarketChangedEventHandler MarketChanged;
+
+        /// <summary>
         /// Conflation indicates slow consumption
         /// </summary>
         public int ConflatedCount { get; internal set; }
+
+        /// <summary>
+        /// Market count
+        /// </summary>
+        public int Count
+        {
+            get
+            {
+                return _markets.Count;
+            }
+        }
+
+        /// <summary>
+        /// Wether markets are automatically removed on close
+        /// (default is true)
+        /// </summary>
+        public bool IsMarketRemovedOnClose { get; set; }
+
+        /// <summary>
+        /// All the cached markets
+        /// </summary>
+        public IEnumerable<Market> Markets
+        {
+            get
+            {
+                return _markets.Values;
+            }
+        }
+
+        /// <summary>
+        /// Queries by market id - the result is invariant for the
+        /// lifetime of the market.
+        /// </summary>
+        /// <param name="marketid"></param>
+        /// <returns></returns>
+        public Market this[string marketid]
+        {
+            get
+            {
+                return _markets[marketid];
+            }
+        }
 
         public void OnMarketChange(ChangeMessage<MarketChange> changeMessage)
         {
@@ -34,66 +94,40 @@ namespace BetfairNG.ESAClient.Cache
                 //clear cache
                 _markets.Clear();
             }
-            if(changeMessage.Items != null)
+            if (changeMessage.Items != null)
             {
                 //lazy build events
-                List<MarketChangedEventArgs> batch = BatchMarketsChanged == null ? null : new List<MarketChangedEventArgs>(changeMessage.Items.Count);           
+                List<MarketChangedEventArgs> batch = BatchMarketsChanged == null ? null : new List<MarketChangedEventArgs>(changeMessage.Items.Count);
 
                 foreach (MarketChange marketChange in changeMessage.Items)
                 {
                     Market market = OnMarketChange(marketChange);
 
-                    if(IsMarketRemovedOnClose && market.IsClosed)
+                    if (IsMarketRemovedOnClose && market.IsClosed)
                     {
                         //remove on close
-                        Market removed;
-                        _markets.TryRemove(market.MarketId, out removed);
+                        _markets.TryRemove(market.MarketId, out Market removed);
                     }
 
                     //lazy build events
-                    if(batch != null || MarketChanged != null)
+                    if (batch != null || MarketChanged != null)
                     {
-                        MarketChangedEventArgs arg = new MarketChangedEventArgs() { Change = marketChange, Market = market };
-                        if(MarketChanged != null)
+                        MarketChangedEventArgs arg = new() { Change = marketChange, Market = market };
+                        if (MarketChanged != null)
                         {
                             DispatchMarketChanged(arg);
                         }
-                        if(batch != null)
+                        if (batch != null)
                         {
                             batch.Add(arg);
                         }
                     }
                 }
-                if(batch != null)
+                if (batch != null)
                 {
                     DispatchBatchMarketsChanged(new BatchMarketsChangedEventArgs() { Changes = batch });
                 }
             }
-        }
-
-
-
-        private Market OnMarketChange(MarketChange marketChange)
-        {
-            if(marketChange.Con == true)
-            {
-                ConflatedCount++;
-            }
-            Market market = _markets.GetOrAdd(marketChange.Id, id => new Market(this, id));
-            market.OnMarketChange(marketChange);
-            return market;
-        }
-
-        private void DispatchMarketChanged(MarketChangedEventArgs args)
-        {
-            try
-            {
-                MarketChanged.Invoke(this, args);
-            }
-            catch(Exception e)
-            {
-                Trace.TraceError("Error dispatching event: {0}", e);
-            }            
         }
 
         private void DispatchBatchMarketsChanged(BatchMarketsChangedEventArgs args)
@@ -108,64 +142,29 @@ namespace BetfairNG.ESAClient.Cache
             }
         }
 
-        /// <summary>
-        /// Wether markets are automatically removed on close
-        /// (default is true)
-        /// </summary>
-        public bool IsMarketRemovedOnClose { get; set; }
-
-        /// <summary>
-        /// Event for each market change
-        /// </summary>
-        public event MarketChangedEventHandler MarketChanged;
-
-        /// <summary>
-        /// Event for each batch of market changes
-        /// (note to be truly atomic you will want to set to merge segments
-        /// otherwise an event could be segmented)
-        /// </summary>
-        public event BatchMarketsChangedEventHandler BatchMarketsChanged;
-
-        /// <summary>
-        /// Queries by market id - the result is invariant for the 
-        /// lifetime of the market.
-        /// </summary>
-        /// <param name="marketid"></param>
-        /// <returns></returns>
-        public Market this[string marketid]
+        private void DispatchMarketChanged(MarketChangedEventArgs args)
         {
-            get
+            try
             {
-                return _markets[marketid];
+                MarketChanged.Invoke(this, args);
+            }
+            catch (Exception e)
+            {
+                Trace.TraceError("Error dispatching event: {0}", e);
             }
         }
 
-        /// <summary>
-        /// All the cached markets
-        /// </summary>
-        public IEnumerable<Market> Markets
+        private Market OnMarketChange(MarketChange marketChange)
         {
-            get
+            if (marketChange.Con == true)
             {
-                return _markets.Values;
+                ConflatedCount++;
             }
-        }
-
-        /// <summary>
-        /// Market count
-        /// </summary>
-        public int Count
-        {
-            get
-            {
-                return _markets.Count;
-            }
+            Market market = _markets.GetOrAdd(marketChange.Id, id => new Market(this, id));
+            market.OnMarketChange(marketChange);
+            return market;
         }
     }
-
-    public delegate void MarketChangedEventHandler(object sender, MarketChangedEventArgs e);
-
-    public delegate void BatchMarketsChangedEventHandler(object sender, BatchMarketsChangedEventArgs e);
 
     public class MarketChangedEventArgs : EventArgs
     {
@@ -189,10 +188,5 @@ namespace BetfairNG.ESAClient.Cache
                 return Market.Snap;
             }
         }
-    }
-
-    public class BatchMarketsChangedEventArgs : EventArgs
-    {
-        public IList<MarketChangedEventArgs> Changes { get; internal set; }
     }
 }

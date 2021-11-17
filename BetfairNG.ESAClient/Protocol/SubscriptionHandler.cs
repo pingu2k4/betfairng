@@ -1,12 +1,10 @@
-﻿using BetfairNG.ESASwagger.Model;
+﻿using Betfair.ESASwagger.Model;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 
-namespace BetfairNG.ESAClient.Protocol
+namespace Betfair.ESAClient.Protocol
 {
     /// <summary>
     /// Generic subscription handler for change messages:
@@ -17,16 +15,16 @@ namespace BetfairNG.ESAClient.Protocol
     /// <typeparam name="S">Subscription request message type</typeparam>
     /// <typeparam name="C">Change message type</typeparam>
     /// <typeparam name="I">Change message item type</typeparam>
-    public class SubscriptionHandler<S,C,I> where C : ChangeMessage<I> where S : RequestMessage
+    public class SubscriptionHandler<S, C, I> where C : ChangeMessage<I> where S : RequestMessage
     {
-        private int _subscriptionId;
+        private readonly bool _isMergeSegments;
         private bool _isSubscribed;
-        private bool _isMergeSegments;
-        private List<I> _mergedChanges;
-        private Stopwatch _ttfm;
-        private Stopwatch _ttlm;
         private int _itemCount;
-        private TaskCompletionSource<bool> _subscriptionComplete = new TaskCompletionSource<bool>();
+        private List<I> _mergedChanges;
+        private readonly TaskCompletionSource<bool> _subscriptionComplete = new();
+        private readonly int _subscriptionId;
+        private readonly Stopwatch _ttfm;
+        private readonly Stopwatch _ttlm;
 
         public SubscriptionHandler(int id, S subscriptionMessage, bool isMergeSegments)
         {
@@ -38,22 +36,21 @@ namespace BetfairNG.ESAClient.Protocol
             _ttlm = Stopwatch.StartNew();
         }
 
-        internal void Cancel()
-        {
-            //unwind waiters
-            _subscriptionComplete.TrySetCanceled();
-        }
+        public string Clk { get; private set; }
 
+        public long? ConflationMs { get; private set; }
+
+        public TimeSpan HeartbeatInterval { get; private set; }
+
+        public long? HeartbeatMs { get; private set; }
 
         public string InitialClk { get; private set; }
-        public string Clk { get; private set; }
-        public S SubscriptionMessage { get; private set; }
+
         public bool IsSubscribed { get; private set; }
-        public long? HeartbeatMs { get; private set; }
-        public long? ConflationMs { get; private set; }
-        public long? LastPt { get; private set; }
+
         public DateTime LastArrivalTime { get; private set; }
-        public TimeSpan HeartbeatInterval { get; private set; }
+
+        public long? LastPt { get; private set; }
 
         public Task<bool> SubscriptionComplete
         {
@@ -63,10 +60,11 @@ namespace BetfairNG.ESAClient.Protocol
             }
         }
 
+        public S SubscriptionMessage { get; private set; }
 
         public C ProcessChangeMessage(C changeMessage)
         {
-            if(_subscriptionId != changeMessage.Id)
+            if (_subscriptionId != changeMessage.Id)
             {
                 //previous subscription id - ignore
                 return null;
@@ -88,20 +86,20 @@ namespace BetfairNG.ESAClient.Protocol
                 //Swallow heartbeats
                 changeMessage = null;
             }
-            else if(changeMessage.SegmentType != SegmentType.NONE && _isMergeSegments)
+            else if (changeMessage.SegmentType != SegmentType.NONE && _isMergeSegments)
             {
                 //Segmented message and we're instructed to merge (which makes segments look atomic).
                 changeMessage = MergeMessage(changeMessage);
             }
 
-            if(changeMessage != null)
+            if (changeMessage != null)
             {
                 //store clocks
-                if(changeMessage.InitialClk != null)
+                if (changeMessage.InitialClk != null)
                 {
                     InitialClk = changeMessage.InitialClk;
                 }
-                if(changeMessage.Clk != null)
+                if (changeMessage.Clk != null)
                 {
                     Clk = changeMessage.Clk;
                 }
@@ -114,7 +112,7 @@ namespace BetfairNG.ESAClient.Protocol
                         _itemCount += changeMessage.Items.Count;
                     }
                 }
-                
+
                 if (changeMessage.IsEndOfRecovery)
                 {
                     //End of recovery
@@ -123,11 +121,11 @@ namespace BetfairNG.ESAClient.Protocol
                     HeartbeatInterval = TimeSpan.FromMilliseconds((double)HeartbeatMs);
                     ConflationMs = changeMessage.ConflateMs;
                     _ttlm.Stop();
-                    Trace.TraceInformation("{0}: End of image: type:{6}, ttfm:{1}, ttlm:{2}, conflation:{3}, heartbeat:{4}, change.items:{5}", 
-                        typeof(S).Name, 
-                        _ttfm.Elapsed, 
-                        _ttlm.Elapsed, 
-                        ConflationMs, 
+                    Trace.TraceInformation("{0}: End of image: type:{6}, ttfm:{1}, ttlm:{2}, conflation:{3}, heartbeat:{4}, change.items:{5}",
+                        typeof(S).Name,
+                        _ttfm.Elapsed,
+                        _ttlm.Elapsed,
+                        ConflationMs,
                         HeartbeatMs,
                         _itemCount,
                         changeMessage.ChangeType);
@@ -135,9 +133,14 @@ namespace BetfairNG.ESAClient.Protocol
                     //unwind future
                     _subscriptionComplete.TrySetResult(true);
                 }
-               
             }
             return changeMessage;
+        }
+
+        internal void Cancel()
+        {
+            //unwind waiters
+            _subscriptionComplete.TrySetCanceled();
         }
 
         private C MergeMessage(C changeMessage)

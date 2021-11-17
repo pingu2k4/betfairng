@@ -1,7 +1,6 @@
-﻿
-using BetfairNG.ESAClient.Auth;
-using BetfairNG.ESAClient.Protocol;
-using BetfairNG.ESASwagger.Model;
+﻿using Betfair.ESAClient.Auth;
+using Betfair.ESAClient.Protocol;
+using Betfair.ESASwagger.Model;
 using System;
 using System.Diagnostics;
 using System.IO;
@@ -11,7 +10,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace BetfairNG.ESAClient
+namespace Betfair.ESAClient
 {
     /// <summary>
     /// Simple ESA Client that connects using a standard SSL socket.
@@ -19,100 +18,56 @@ namespace BetfairNG.ESAClient
     /// </summary>
     public class Client
     {
-        //socket members
-        private StreamReader _reader;
-        private StreamWriter _writer;
-        private string _hostName;
-        private int _port;
-        private TcpClient _client;
-
         /// <summary>
-        /// Handles session creation
+        /// Lock used during retry back-off
         /// </summary>
-        private AppKeyAndSessionProvider _sessionProvider;
-        /// <summary>
-        /// Handles request / response correlation
-        /// </summary>
-        private RequestResponseProcessor _processor;
-
-        /// <summary>
-        /// Timer that checks socket connectivity.
-        /// </summary>
-        private Timer _keepAliveTimer;
+        private readonly object _retryLock = new();
 
         /// <summary>
         /// Lock protecting start / stop flow control
         /// </summary>
-        private readonly object _startStopLock = new object();
-        /// <summary>
-        /// Lock used during retry back-off
-        /// </summary>
-        private readonly object _retryLock = new object();
+        private readonly object _startStopLock = new();
+
+        private TcpClient _client;
+
+        private readonly string _hostName;
+
         /// <summary>
         /// Flag used to protect / signal starting.
         /// </summary>
         private volatile bool _isStarted = false;
-        /// <summary>
-        /// Flag used to protect / signal stopping.
-        /// </summary>
-        private volatile bool _isStopping = false;
+
         /// <summary>
         /// Signal send when stopping is completed
         /// </summary>
         private ManualResetEvent _isStopped;
 
         /// <summary>
-        /// Count of disconnects.
+        /// Flag used to protect / signal stopping.
         /// </summary>
-        public int DisconnectCounter { get; private set; }
-        /// <summary>
-        /// Count of reconnects (reset once reconnect completes).
-        /// </summary>
-        public int ReconnectCounter { get; private set; }
-
+        private volatile bool _isStopping = false;
 
         /// <summary>
-        /// Conflation rate to set on subscriptions (if set)
+        /// Timer that checks socket connectivity.
         /// </summary>
-        public long? ConflateMs { get; set; }
-        /// <summary>
-        /// Heartbeat rate to set on subscriptions (if set)
-        /// </summary>
-        public long? HeartbeatMs { get; set; }
-        /// <summary>
-        /// Default market data filter (if set) to set on every market 
-        /// data subscription.
-        /// </summary>
-        public MarketDataFilter MarketDataFilter { get; set; }
+        private Timer _keepAliveTimer;
 
-
+        private readonly int _port;
 
         /// <summary>
-        /// Specifies the timeout (default is 30s)
+        /// Handles request / response correlation
         /// </summary>
-        public TimeSpan Timeout { get; set; }
+        private readonly RequestResponseProcessor _processor;
+
+        //socket members
+        private StreamReader _reader;
 
         /// <summary>
-        /// Specifies the connection retry back-off (default is 15s)
-        /// Which kicks in after the first attempt.
+        /// Handles session creation
         /// </summary>
-        public TimeSpan ReconnectBackOff { get; set; }
+        private readonly AppKeyAndSessionProvider _sessionProvider;
 
-        /// <summary>
-        /// Specifies a time to send an explicit hearbeat (default is 1hr)
-        /// </summary>
-        public TimeSpan KeepAliveHeartbeat { get; set; }
-
-        /// <summary>
-        /// Connection status
-        /// </summary>
-        public ConnectionStatus Status {
-            get
-            {
-                return _processor.Status;
-            }
-        }
-
+        private StreamWriter _writer;
 
         /// <summary>
         /// Construct a new client to the specified host and port
@@ -135,20 +90,6 @@ namespace BetfairNG.ESAClient
             KeepAliveHeartbeat = TimeSpan.FromHours(1);
         }
 
-        private void DispatchConnectionStatusChanged(object sender, ConnectionStatusEventArgs e)
-        {
-            if(ConnectionStatusChanged != null)
-            {
-                try
-                {
-                    ConnectionStatusChanged(this, e);
-                } catch (Exception ex)
-                {
-                    Trace.TraceError("Exception thrown dispatch", ex);
-                }
-            }
-        }
-
         /// <summary>
         /// Event raised on connection status change.
         /// </summary>
@@ -161,27 +102,6 @@ namespace BetfairNG.ESAClient
         /// 2) Subscription recovery is via delta
         /// </summary>
         public bool AutoReconnect { get; set; }
-
-        /// <summary>
-        /// Last connect time
-        /// </summary>
-        public DateTime LastConnectTime { get; private set; }
-
-        /// <summary>
-        /// Wether to log change messages and if so at what character trunctation 
-        /// (default is 0 which is off)
-        /// </summary>
-        public int TraceChangeTruncation
-        {
-            get
-            {
-                return _processor.TraceChangeTruncation;                
-            }
-            set
-            {
-                _processor.TraceChangeTruncation = value;
-            }
-        }
 
         /// <summary>
         /// ClientCache is abstracted via this hook (enabling replacement)
@@ -198,6 +118,128 @@ namespace BetfairNG.ESAClient
             }
         }
 
+        /// <summary>
+        /// Conflation rate to set on subscriptions (if set)
+        /// </summary>
+        public long? ConflateMs { get; set; }
+
+        /// <summary>
+        /// Count of disconnects.
+        /// </summary>
+        public int DisconnectCounter { get; private set; }
+
+        /// <summary>
+        /// Heartbeat rate to set on subscriptions (if set)
+        /// </summary>
+        public long? HeartbeatMs { get; set; }
+
+        /// <summary>
+        /// Specifies a time to send an explicit hearbeat (default is 1hr)
+        /// </summary>
+        public TimeSpan KeepAliveHeartbeat { get; set; }
+
+        /// <summary>
+        /// Last connect time
+        /// </summary>
+        public DateTime LastConnectTime { get; private set; }
+
+        /// <summary>
+        /// Default market data filter (if set) to set on every market
+        /// data subscription.
+        /// </summary>
+        public MarketDataFilter MarketDataFilter { get; set; }
+
+        /// <summary>
+        /// Specifies the connection retry back-off (default is 15s)
+        /// Which kicks in after the first attempt.
+        /// </summary>
+        public TimeSpan ReconnectBackOff { get; set; }
+
+        /// <summary>
+        /// Count of reconnects (reset once reconnect completes).
+        /// </summary>
+        public int ReconnectCounter { get; private set; }
+
+        /// <summary>
+        /// Connection status
+        /// </summary>
+        public ConnectionStatus Status
+        {
+            get
+            {
+                return _processor.Status;
+            }
+        }
+
+        /// <summary>
+        /// Specifies the timeout (default is 30s)
+        /// </summary>
+        public TimeSpan Timeout { get; set; }
+
+        /// <summary>
+        /// Wether to log change messages and if so at what character trunctation
+        /// (default is 0 which is off)
+        /// </summary>
+        public int TraceChangeTruncation
+        {
+            get
+            {
+                return _processor.TraceChangeTruncation;
+            }
+            set
+            {
+                _processor.TraceChangeTruncation = value;
+            }
+        }
+
+        /// <summary>
+        /// Force disconnects the socket.
+        /// Note:
+        /// If AutoReconnect is enabled the socket will be re-created.
+        /// </summary>
+        public void Disconnect()
+        {
+            //Disconnect socket
+            if (_client != null)
+            {
+                _client.Close();
+                _client = null;
+            }
+        }
+
+        /// <summary>
+        /// Heartbeat to the server (syncronously) - useful to keep network hardware open.
+        /// (not required by server).
+        /// </summary>
+        public void Heartbeat()
+        {
+            WaitFor(_processor.Heartbeat(new HeartbeatMessage()));
+        }
+
+        /// <summary>
+        /// Subscribe the the specified orders (syncronously) with the configured
+        /// HeartbeatMS, ConflationMS and MarketDataFilter.
+        /// </summary>
+        /// <param name="message"></param>
+        public void MarketSubscription(MarketSubscriptionMessage message)
+        {
+            message.ConflateMs = ConflateMs;
+            message.HeartbeatMs = HeartbeatMs;
+            if (MarketDataFilter != null) message.MarketDataFilter = MarketDataFilter;
+            WaitFor(_processor.MarketSubscription(message));
+        }
+
+        /// <summary>
+        /// Subscribe the the specified orders (syncronously) with the configured
+        /// HeartbeatMS, ConflationMS.
+        /// </summary>
+        /// <param name="message"></param>
+        public void OrderSubscription(OrderSubscriptionMessage message)
+        {
+            message.ConflateMs = ConflateMs;
+            message.HeartbeatMs = HeartbeatMs;
+            WaitFor(_processor.OrderSubscription(message));
+        }
 
         /// <summary>
         /// Starts a connection (synchronously).
@@ -221,13 +263,14 @@ namespace BetfairNG.ESAClient
                 //On initial start ensure we have a fresh session (to avoid risk of invalid session).
                 _sessionProvider.ExpireTokenNow();
 
-
                 //Socket level connect
                 ConnectSocket();
 
                 //Start processing thread
-                Thread thread = new Thread(new ThreadStart(Run));
-                thread.Name = "ESAClient";
+                Thread thread = new(new ThreadStart(Run))
+                {
+                    Name = "ESAClient"
+                };
                 thread.Start();
 
                 //Start keep alive timer
@@ -239,8 +282,6 @@ namespace BetfairNG.ESAClient
                 _isStarted = true;
             }
         }
-
-
 
         public void Stop()
         {
@@ -258,7 +299,7 @@ namespace BetfairNG.ESAClient
                 //shutdown keep-alive
                 _keepAliveTimer.Dispose();
 
-                //signal in case sleeping    
+                //signal in case sleeping
                 lock (_retryLock)
                 {
                     Monitor.PulseAll(_retryLock);
@@ -270,61 +311,6 @@ namespace BetfairNG.ESAClient
                 //block waiting for esa client thread to signal exit
                 _isStopped.WaitOne();
             }
-        }
-
-        /// <summary>
-        /// Force disconnects the socket.
-        /// Note: 
-        /// If AutoReconnect is enabled the socket will be re-created.
-        /// </summary>
-        public void Disconnect()
-        {
-            //Disconnect socket
-            if (_client != null)
-            {
-                _client.Close();
-                _client = null;
-            }
-        }
-
-        private void KeepAliveCheck(object state)
-        {
-            try
-            {
-                if(_processor.Status == ConnectionStatus.SUBSCRIBED)
-                {
-                    //connection looks up
-                    if (_processor.LastRequestTime + KeepAliveHeartbeat < DateTime.UtcNow)
-                    {
-                        //send a heartbeat to server to keep networks open
-                        Trace.TraceInformation("Last Request Time is longer than {0}: Sending Keep Alive Heartbate", KeepAliveHeartbeat);
-                        Heartbeat();
-                    }
-                    else if(_processor.LastResponseTime + Timeout < DateTime.UtcNow)
-                    {
-                        Trace.TraceInformation("Last Response Time is longer than {0}: Sending Keep Alive Heartbate", Timeout);
-                        Heartbeat();
-                    }
-
-                }
-            }
-            catch (Exception e)
-            {
-                Trace.TraceError("Keep alive failed", e);
-            }
-        }
-
-        private void ConnectAndAuthenticate()
-        {
-            //Wait for connection message
-            if (!_processor.ConnectionMessage().Wait(Timeout))
-            {
-                //timeout
-                throw new TimeoutException("Request timeout - Timeout=" + Timeout);
-            }
-
-            //Authenticate
-            Authenticate();
         }
 
         private void Authenticate()
@@ -353,174 +339,17 @@ namespace BetfairNG.ESAClient
             }
         }
 
-        private Task<StatusMessage> WaitFor(Task<StatusMessage> task)
+        private void ConnectAndAuthenticate()
         {
-            if (task.Wait(Timeout))
+            //Wait for connection message
+            if (!_processor.ConnectionMessage().Wait(Timeout))
             {
-                if (task.IsCanceled)
-                {
-                    throw new IOException("Connection failed");
-                }
-                //server responed
-                if(task.Result.StatusCode == StatusMessage.StatusCodeEnum.Success)
-                {
-                    return task;
-                }
-                else
-                {
-                    //status error
-                    throw new StatusException(task.Result);
-                }
-            }
-            else
-            {
-                //timeout 
+                //timeout
                 throw new TimeoutException("Request timeout - Timeout=" + Timeout);
             }
-        }
 
-
-
-        /// <summary>
-        /// Disconnects previous socket and then:
-        /// 1) Creates a session.
-        /// 2) Creates a socket.
-        /// 3) Forms SSL layer.
-        /// </summary>
-        private void ConnectSocket()
-        {
-            LastConnectTime = DateTime.UtcNow;
-
-            //Disconnect socket
-            Disconnect();
-
-            //pre-fetch the session (as auth will follow)
-            AppKeyAndSession appKeyAndSession = _sessionProvider.GetOrCreateNewSession();
-
-            //create socket
-            Trace.TraceInformation("ESAClient: Opening socket to: {0}:{1}",_hostName, _port);
-            _client = new TcpClient(_hostName, _port);
-            _client.ReceiveBufferSize = 1024 * 1000 * 2; //shaves about 20s off firehose image.
-            _client.SendTimeout = (int)Timeout.TotalMilliseconds;
-            _client.ReceiveTimeout = (int)Timeout.TotalMilliseconds;
-            Stream stream = _client.GetStream();
-
-            if (_port == 443)
-            {
-                //SSL is on
-                Trace.TraceInformation("ESAClient: Opening ssl stream to: {0}:{1}", _hostName, _port);
-
-                // Create an SSL stream that will close the client's stream.
-                SslStream sslStream = new SslStream(stream, false);
-
-                //Setup ssl
-                sslStream.AuthenticateAsClient(_hostName);
-
-                stream = sslStream;
-            }
-
-            //Setup reader / writer
-            _reader = new StreamReader(stream, Encoding.UTF8, false, _client.ReceiveBufferSize);
-            _writer = new StreamWriter(stream, Encoding.UTF8);
-        }
-
-
-
-
-        private void Run()
-        {
-            Trace.TraceInformation("ESAClient: Processing thread started");
-            while (!_isStopping)
-            {
-                string line = null;
-                try
-                {
-                    line = _reader.ReadLine();
-                    if(line == null)
-                    {
-                        throw new IOException("Socket closed - EOF");
-                    }
-                    else
-                    {
-                        _processor.ReceiveLine(line);
-                    }
-                }
-                catch (Exception e)
-                {
-                    if (!_isStopping)
-                    {
-                        Trace.TraceError("Error received processing socket - disconnecting: {0}", e);
-                    }
-                    Disconnected();
-                }
-            }
-            _isStopped.Set();
-            _isStarted = false;
-            Trace.TraceWarning("ESAClient: Processing thread stopped");
-        }
-
-        private void Disconnected()
-        {
-            DisconnectCounter++;
-
-            
-            if (_isStarted && !_isStopping && AutoReconnect)
-            {
-                //we've started (successfully) and we're not stopping & should autoreconnect
-
-                //disconnected
-                _processor.Disconnected();
-
-                //try and reconnect
-                TryReconnect();
-            }
-            else
-            {
-                //stopped
-                _processor.Stopped();
-
-                //no reconnect
-                _isStopping = true;
-            }
-        }
-
-
-
-        private void TryReconnect()
-        {
-            if(DateTime.UtcNow - LastConnectTime < ReconnectBackOff)
-            {
-                //Not first disconnect
-                lock (_retryLock)
-                {
-                    Trace.TraceInformation("Reconnect backoff for {0}ms", ReconnectBackOff);
-                    Monitor.Wait(_retryLock, ReconnectBackOff);
-                }
-            }
-
-            lock (_startStopLock)
-            {
-                if (_isStopping)
-                {
-                    //flag off isStopping & within lock to 
-                    return;
-                }
-
-                try
-                {
-                    //create new connection to server - might fail
-                    ConnectSocket();
-
-                    //connect and authenticate - do this async
-                    //as TryReconnect is called from run loop
-                    Task.Run(() => ConnectAndAuthenticateAndResubscribe());
-                }
-                catch (Exception e)
-                {
-                    Trace.TraceError("Reconnect attempt={0} failed: ", ReconnectCounter, e);
-                    ReconnectCounter++;
-                }
-            }   
+            //Authenticate
+            Authenticate();
         }
 
         private void ConnectAndAuthenticateAndResubscribe()
@@ -548,11 +377,154 @@ namespace BetfairNG.ESAClient
 
                 //Reset counter
                 ReconnectCounter = 0;
-            } catch (Exception e)
+            }
+            catch (Exception e)
             {
                 Trace.TraceError("Reconnect failed", e);
                 ReconnectCounter++;
             }
+        }
+
+        /// <summary>
+        /// Disconnects previous socket and then:
+        /// 1) Creates a session.
+        /// 2) Creates a socket.
+        /// 3) Forms SSL layer.
+        /// </summary>
+        private void ConnectSocket()
+        {
+            LastConnectTime = DateTime.UtcNow;
+
+            //Disconnect socket
+            Disconnect();
+
+            //pre-fetch the session (as auth will follow)
+            AppKeyAndSession appKeyAndSession = _sessionProvider.GetOrCreateNewSession();
+
+            //create socket
+            Trace.TraceInformation("ESAClient: Opening socket to: {0}:{1}", _hostName, _port);
+            _client = new TcpClient(_hostName, _port)
+            {
+                ReceiveBufferSize = 1024 * 1000 * 2, //shaves about 20s off firehose image.
+                SendTimeout = (int)Timeout.TotalMilliseconds,
+                ReceiveTimeout = (int)Timeout.TotalMilliseconds
+            };
+            Stream stream = _client.GetStream();
+
+            if (_port == 443)
+            {
+                //SSL is on
+                Trace.TraceInformation("ESAClient: Opening ssl stream to: {0}:{1}", _hostName, _port);
+
+                // Create an SSL stream that will close the client's stream.
+                SslStream sslStream = new(stream, false);
+
+                //Setup ssl
+                sslStream.AuthenticateAsClient(_hostName);
+
+                stream = sslStream;
+            }
+
+            //Setup reader / writer
+            _reader = new StreamReader(stream, Encoding.UTF8, false, _client.ReceiveBufferSize);
+            _writer = new StreamWriter(stream, Encoding.UTF8);
+        }
+
+        private void Disconnected()
+        {
+            DisconnectCounter++;
+
+            if (_isStarted && !_isStopping && AutoReconnect)
+            {
+                //we've started (successfully) and we're not stopping & should autoreconnect
+
+                //disconnected
+                _processor.Disconnected();
+
+                //try and reconnect
+                TryReconnect();
+            }
+            else
+            {
+                //stopped
+                _processor.Stopped();
+
+                //no reconnect
+                _isStopping = true;
+            }
+        }
+
+        private void DispatchConnectionStatusChanged(object sender, ConnectionStatusEventArgs e)
+        {
+            if (ConnectionStatusChanged != null)
+            {
+                try
+                {
+                    ConnectionStatusChanged(this, e);
+                }
+                catch (Exception ex)
+                {
+                    Trace.TraceError("Exception thrown dispatch", ex);
+                }
+            }
+        }
+
+        private void KeepAliveCheck(object state)
+        {
+            try
+            {
+                if (_processor.Status == ConnectionStatus.SUBSCRIBED)
+                {
+                    //connection looks up
+                    if (_processor.LastRequestTime + KeepAliveHeartbeat < DateTime.UtcNow)
+                    {
+                        //send a heartbeat to server to keep networks open
+                        Trace.TraceInformation("Last Request Time is longer than {0}: Sending Keep Alive Heartbate", KeepAliveHeartbeat);
+                        Heartbeat();
+                    }
+                    else if (_processor.LastResponseTime + Timeout < DateTime.UtcNow)
+                    {
+                        Trace.TraceInformation("Last Response Time is longer than {0}: Sending Keep Alive Heartbate", Timeout);
+                        Heartbeat();
+                    }
+                }
+            }
+            catch (Exception e)
+            {
+                Trace.TraceError("Keep alive failed", e);
+            }
+        }
+
+        private void Run()
+        {
+            Trace.TraceInformation("ESAClient: Processing thread started");
+            while (!_isStopping)
+            {
+                string line = null;
+                try
+                {
+                    line = _reader.ReadLine();
+                    if (line == null)
+                    {
+                        throw new IOException("Socket closed - EOF");
+                    }
+                    else
+                    {
+                        _processor.ReceiveLine(line);
+                    }
+                }
+                catch (Exception e)
+                {
+                    if (!_isStopping)
+                    {
+                        Trace.TraceError("Error received processing socket - disconnecting: {0}", e);
+                    }
+                    Disconnected();
+                }
+            }
+            _isStopped.Set();
+            _isStarted = false;
+            Trace.TraceWarning("ESAClient: Processing thread stopped");
         }
 
         /// <summary>
@@ -566,7 +538,7 @@ namespace BetfairNG.ESAClient
                 _writer.WriteLine(line);
                 _writer.Flush();
             }
-            catch(IOException e)
+            catch (IOException e)
             {
                 Trace.TraceError("Error sending to socket - disconnecting", e);
                 //Foceably break the socket which will then trigger a reconnect if configured
@@ -575,41 +547,67 @@ namespace BetfairNG.ESAClient
             }
         }
 
-        /// <summary>
-        /// Subscribe the the specified orders (syncronously) with the configured 
-        /// HeartbeatMS, ConflationMS.
-        /// </summary>
-        /// <param name="message"></param>
-        public void OrderSubscription(OrderSubscriptionMessage message)
+        private void TryReconnect()
         {
-            message.ConflateMs = ConflateMs;
-            message.HeartbeatMs = HeartbeatMs;
-            WaitFor(_processor.OrderSubscription(message));
+            if (DateTime.UtcNow - LastConnectTime < ReconnectBackOff)
+            {
+                //Not first disconnect
+                lock (_retryLock)
+                {
+                    Trace.TraceInformation("Reconnect backoff for {0}ms", ReconnectBackOff);
+                    Monitor.Wait(_retryLock, ReconnectBackOff);
+                }
+            }
+
+            lock (_startStopLock)
+            {
+                if (_isStopping)
+                {
+                    //flag off isStopping & within lock to
+                    return;
+                }
+
+                try
+                {
+                    //create new connection to server - might fail
+                    ConnectSocket();
+
+                    //connect and authenticate - do this async
+                    //as TryReconnect is called from run loop
+                    Task.Run(() => ConnectAndAuthenticateAndResubscribe());
+                }
+                catch (Exception e)
+                {
+                    Trace.TraceError("Reconnect attempt={0} failed: ", ReconnectCounter, e);
+                    ReconnectCounter++;
+                }
+            }
         }
 
-        /// <summary>
-        /// Subscribe the the specified orders (syncronously) with the configured 
-        /// HeartbeatMS, ConflationMS and MarketDataFilter.
-        /// </summary>
-        /// <param name="message"></param>
-        public void MarketSubscription(MarketSubscriptionMessage message)
+        private Task<StatusMessage> WaitFor(Task<StatusMessage> task)
         {
-            message.ConflateMs = ConflateMs;
-            message.HeartbeatMs = HeartbeatMs;
-            if (MarketDataFilter != null) message.MarketDataFilter = MarketDataFilter;
-            WaitFor(_processor.MarketSubscription(message));
+            if (task.Wait(Timeout))
+            {
+                if (task.IsCanceled)
+                {
+                    throw new IOException("Connection failed");
+                }
+                //server responed
+                if (task.Result.StatusCode == StatusMessage.StatusCodeEnum.Success)
+                {
+                    return task;
+                }
+                else
+                {
+                    //status error
+                    throw new StatusException(task.Result);
+                }
+            }
+            else
+            {
+                //timeout
+                throw new TimeoutException("Request timeout - Timeout=" + Timeout);
+            }
         }
-
-        /// <summary>
-        /// Heartbeat to the server (syncronously) - useful to keep network hardware open.
-        /// (not required by server).
-        /// </summary>
-        public void Heartbeat()
-        {
-            WaitFor(_processor.Heartbeat(new HeartbeatMessage()));
-        }
-
     }
-
-
 }

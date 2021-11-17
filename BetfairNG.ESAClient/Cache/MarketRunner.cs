@@ -1,11 +1,6 @@
-﻿using BetfairNG.ESASwagger.Model;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using Betfair.ESASwagger.Model;
 
-namespace BetfairNG.ESAClient.Cache
+namespace Betfair.ESAClient.Cache
 {
     /// <summary>
     /// Represents a market runner within a market
@@ -15,72 +10,41 @@ namespace BetfairNG.ESAClient.Cache
         private readonly Market _market;
         private readonly RunnerId _runnerId;
 
-        // Level / Depth Based Ladders
-        private MarketRunnerPrices _runnerPrices = MarketRunnerPrices.EMPTY;
-        private PriceSizeLadder _atlPrices = PriceSizeLadder.NewLay();
-        private PriceSizeLadder _atbPrices = PriceSizeLadder.NewBack();
-        private PriceSizeLadder _trdPrices = PriceSizeLadder.NewLay();
-        private PriceSizeLadder _spbPrices = PriceSizeLadder.NewBack();
-        private PriceSizeLadder _splPrices = PriceSizeLadder.NewLay();
+        private readonly PriceSizeLadder _atbPrices = PriceSizeLadder.NewBack();
+
+        private readonly PriceSizeLadder _atlPrices = PriceSizeLadder.NewLay();
 
         // Full depth Ladders
-        private LevelPriceSizeLadder _batbPrices = new LevelPriceSizeLadder();
-        private LevelPriceSizeLadder _batlPrices = new LevelPriceSizeLadder();
-        private LevelPriceSizeLadder _bdatbPrices = new LevelPriceSizeLadder();
-        private LevelPriceSizeLadder _bdatlPrices = new LevelPriceSizeLadder();
+        private readonly LevelPriceSizeLadder _batbPrices = new();
+
+        private readonly LevelPriceSizeLadder _batlPrices = new();
+
+        private readonly LevelPriceSizeLadder _bdatbPrices = new();
+
+        private readonly LevelPriceSizeLadder _bdatlPrices = new();
+
+        private double _ltp;
+
+        private RunnerDefinition _runnerDefinition;
+
+        // Level / Depth Based Ladders
+        private MarketRunnerPrices _runnerPrices = MarketRunnerPrices.EMPTY;
+
+        private MarketRunnerSnap _snap;
+        private readonly PriceSizeLadder _spbPrices = PriceSizeLadder.NewBack();
+        private double _spf;
+        private readonly PriceSizeLadder _splPrices = PriceSizeLadder.NewLay();
 
         // special prices
         private double _spn;
-        private double _spf;
-        private double _ltp;
+
+        private readonly PriceSizeLadder _trdPrices = PriceSizeLadder.NewLay();
         private double _tv;
-        private RunnerDefinition _runnerDefinition;
-        private MarketRunnerSnap _snap;
-
-
 
         public MarketRunner(Market market, RunnerId runnerId)
         {
             _market = market;
             _runnerId = runnerId;
-        }
-
-        internal void OnPriceChange(bool isImage, RunnerChange runnerChange)
-        {
-            //snap is invalid
-            _snap = null;
-
-            MarketRunnerPrices newPrices = new MarketRunnerPrices();
-
-
-            newPrices.AvailableToLay = _atlPrices.OnPriceChange(isImage, runnerChange.Atl);
-            newPrices.AvailableToBack = _atbPrices.OnPriceChange(isImage, runnerChange.Atb);
-            newPrices.Traded = _trdPrices.OnPriceChange(isImage, runnerChange.Trd);
-            newPrices.StartingPriceBack = _spbPrices.OnPriceChange(isImage, runnerChange.Spb);
-            newPrices.StartingPriceLay = _splPrices.OnPriceChange(isImage, runnerChange.Spl);
-
-
-            newPrices.BestAvailableToBack = _batbPrices.OnPriceChange(isImage, runnerChange.Batb);
-            newPrices.BestAvailableToLay = _batlPrices.OnPriceChange(isImage, runnerChange.Batl);
-            newPrices.BestDisplayAvailableToBack = _bdatbPrices.OnPriceChange(isImage, runnerChange.Bdatb);
-            newPrices.BestDisplayAvailableToLay = _bdatlPrices.OnPriceChange(isImage, runnerChange.Bdatl);
-
-
-            newPrices.StartingPriceNear = Utils.SelectPrice(isImage, ref _spn, runnerChange.Spn);
-            newPrices.StartingPriceFar = Utils.SelectPrice(isImage, ref _spf, runnerChange.Spf);
-            newPrices.LastTradedPrice = Utils.SelectPrice(isImage, ref _ltp, runnerChange.Ltp); 
-            newPrices.TradedVolume = Utils.SelectPrice(isImage, ref _tv, runnerChange.Tv);
-
-            //copy on write
-            _runnerPrices = newPrices;
-        }
-
-        internal void OnRunnerDefinitionChange(RunnerDefinition runnerDefinition)
-        {
-            //snap is invalid
-            _snap = null;
-
-            _runnerDefinition = runnerDefinition;
         }
 
         public RunnerId RunnerId
@@ -98,7 +62,7 @@ namespace BetfairNG.ESAClient.Cache
         {
             get
             {
-                if(_snap == null)
+                if (_snap == null)
                 {
                     _snap = new MarketRunnerSnap()
                     {
@@ -111,7 +75,6 @@ namespace BetfairNG.ESAClient.Cache
             }
         }
 
-
         public override string ToString()
         {
             return "MarketRunner{" +
@@ -121,5 +84,40 @@ namespace BetfairNG.ESAClient.Cache
                     '}';
         }
 
+        internal void OnPriceChange(bool isImage, RunnerChange runnerChange)
+        {
+            //snap is invalid
+            _snap = null;
+
+            MarketRunnerPrices newPrices = new()
+            {
+                AvailableToLay = _atlPrices.OnPriceChange(isImage, runnerChange.Atl),
+                AvailableToBack = _atbPrices.OnPriceChange(isImage, runnerChange.Atb),
+                Traded = _trdPrices.OnPriceChange(isImage, runnerChange.Trd),
+                StartingPriceBack = _spbPrices.OnPriceChange(isImage, runnerChange.Spb),
+                StartingPriceLay = _splPrices.OnPriceChange(isImage, runnerChange.Spl),
+
+                BestAvailableToBack = _batbPrices.OnPriceChange(isImage, runnerChange.Batb),
+                BestAvailableToLay = _batlPrices.OnPriceChange(isImage, runnerChange.Batl),
+                BestDisplayAvailableToBack = _bdatbPrices.OnPriceChange(isImage, runnerChange.Bdatb),
+                BestDisplayAvailableToLay = _bdatlPrices.OnPriceChange(isImage, runnerChange.Bdatl),
+
+                StartingPriceNear = Utils.SelectPrice(isImage, ref _spn, runnerChange.Spn),
+                StartingPriceFar = Utils.SelectPrice(isImage, ref _spf, runnerChange.Spf),
+                LastTradedPrice = Utils.SelectPrice(isImage, ref _ltp, runnerChange.Ltp),
+                TradedVolume = Utils.SelectPrice(isImage, ref _tv, runnerChange.Tv)
+            };
+
+            //copy on write
+            _runnerPrices = newPrices;
+        }
+
+        internal void OnRunnerDefinitionChange(RunnerDefinition runnerDefinition)
+        {
+            //snap is invalid
+            _snap = null;
+
+            _runnerDefinition = runnerDefinition;
+        }
     }
 }

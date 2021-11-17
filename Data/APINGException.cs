@@ -1,7 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using Newtonsoft.Json;
 using System.Runtime.Serialization;
 
@@ -16,11 +12,11 @@ namespace BetfairNG.Data
             this.RequestUUID = info.GetString("requestUUID");
         }
 
+        [JsonProperty(PropertyName = "errorCode")]
+        public string ErrorCode { get; set; }
+
         [JsonProperty(PropertyName = "errorDetails")]
         public string ErrorDetails { get; set; }
-
-        [JsonProperty(PropertyName = "errorCode")]
-        public string ErrorCode { get; set; }	
 
         [JsonProperty(PropertyName = "requestUUID")]
         public string RequestUUID { get; set; }

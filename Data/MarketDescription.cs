@@ -1,33 +1,37 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using Newtonsoft.Json;
+using System;
+using System.Text;
 
 namespace BetfairNG.Data
 {
     public class MarketDescription
     {
-        [JsonProperty(PropertyName = "persistenceEnabled")]
-        public bool IsPersistenceEnabled { get; set; }
+        [JsonProperty(PropertyName = "bettingType")]
+        public MarketBettingType BettingType { get; set; }
+
+        [JsonProperty(PropertyName = "clarifications")]
+        public string Clarifications { get; set; }
+
+        [JsonProperty(PropertyName = "eachWayDivisor")]
+        public double EachWayDivisor { get; set; }
 
         [JsonProperty(PropertyName = "bspMarket")]
         public bool IsBspMarket { get; set; }
 
-        [JsonProperty(PropertyName = "marketTime")]
-        public DateTime MarketTime { get; set; }
+        [JsonProperty(PropertyName = "discountAllowed")]
+        public bool IsDiscountAllowed { get; set; }
 
-        [JsonProperty(PropertyName = "suspendTime")]
-        public DateTime? SuspendTime { get; set; }
-
-        [JsonProperty(PropertyName = "settleTime")]
-        public DateTime? SettleTime { get; set; }
-
-        [JsonProperty(PropertyName = "bettingType")]
-        public MarketBettingType BettingType { get; set; }
+        [JsonProperty(PropertyName = "persistenceEnabled")]
+        public bool IsPersistenceEnabled { get; set; }
 
         [JsonProperty(PropertyName = "turnInPlayEnabled")]
         public bool IsTurnInPlayEnabled { get; set; }
+
+        [JsonProperty(PropertyName = "marketBaseRate")]
+        public double MarketBaseRate { get; set; }
+
+        [JsonProperty(PropertyName = "marketTime")]
+        public DateTime MarketTime { get; set; }
 
         [JsonProperty(PropertyName = "marketType")]
         public string MarketType { get; set; }
@@ -35,26 +39,20 @@ namespace BetfairNG.Data
         [JsonProperty(PropertyName = "regulator")]
         public string Regulator { get; set; }
 
-        [JsonProperty(PropertyName = "marketBaseRate")]
-        public double MarketBaseRate { get; set; }
-
-        [JsonProperty(PropertyName = "discountAllowed")]
-        public bool IsDiscountAllowed { get; set; }
-
-        [JsonProperty(PropertyName = "wallet")]
-        public string Wallet { get; set; }
-
         [JsonProperty(PropertyName = "rules")]
         public string Rules { get; set; }
 
         [JsonProperty(PropertyName = "rulesHasDate")]
         public bool RulesHasDate { get; set; }
 
-        [JsonProperty(PropertyName = "eachWayDivisor")]
-        public double EachWayDivisor { get; set; }
+        [JsonProperty(PropertyName = "settleTime")]
+        public DateTime? SettleTime { get; set; }
 
-        [JsonProperty(PropertyName = "clarifications")]
-        public string Clarifications { get; set; }
+        [JsonProperty(PropertyName = "suspendTime")]
+        public DateTime? SuspendTime { get; set; }
+
+        [JsonProperty(PropertyName = "wallet")]
+        public string Wallet { get; set; }
 
         public override string ToString()
         {

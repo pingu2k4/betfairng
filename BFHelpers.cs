@@ -1,62 +1,18 @@
-﻿using System;
+﻿using Betfair.ESAClient.Cache;
+using BetfairNG.Data;
+using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using System.Diagnostics;
-using System.Reactive;
 using System.Reactive.Linq;
-using System.Reactive.Concurrency;
-using System.Collections.Concurrent;
-using BetfairNG.Data;
-using BetfairNG.ESAClient.Cache;
+using System.Text;
 
 namespace BetfairNG
 {
     public static class BFHelpers
     {
-        public static MarketFilter HorseRaceFilter(string country = null)
+        public static List<Order> Backs(this List<Order> orders)
         {
-            var marketFilter = new MarketFilter();
-            marketFilter.EventTypeIds = new HashSet<string>() { "7" };
-            marketFilter.MarketStartTime = new TimeRange()
-            {
-                From = DateTime.Now,
-                To = DateTime.Now.AddDays(1)
-            };
-            if (country != null)
-                marketFilter.MarketCountries = new HashSet<string>() { country };
-            marketFilter.MarketTypeCodes = new HashSet<String>() { "WIN" };
-
-            return marketFilter;
-        }
-
-        public static PriceProjection HorseRacePriceProjection()
-        {
-            ISet<PriceData> priceData = new HashSet<PriceData>();
-            //get all prices from the exchange
-            priceData.Add(PriceData.EX_TRADED);
-            priceData.Add(PriceData.EX_ALL_OFFERS);
-
-            var priceProjection = new PriceProjection();
-            priceProjection.PriceData = priceData;
-            return priceProjection;
-        }
-
-        public static ISet<MarketProjection> HorseRaceProjection()
-        {
-            ISet<MarketProjection> marketProjections = new HashSet<MarketProjection>();
-            marketProjections.Add(MarketProjection.RUNNER_METADATA);
-            marketProjections.Add(MarketProjection.MARKET_DESCRIPTION);
-            marketProjections.Add(MarketProjection.EVENT);
-
-            return marketProjections;
-        }
-
-        public static double GetMarketEfficiency(IEnumerable<double> odds)
-        {
-            double total = odds.Sum(c => 1.0 / c);
-            return 1.0 / total;
+            return orders.Where(c => c.Side == Side.BACK).ToList();
         }
 
         public static double Best(this List<Data.PriceSize> prices)
@@ -67,16 +23,6 @@ namespace BetfairNG
                 return 0.0;
         }
 
-        public static List<Order> Backs(this List<Order> orders)
-        {
-            return orders.Where(c => c.Side == Side.BACK).ToList();
-        }
-
-        public static List<Order> Lays(this List<Order> orders)
-        {
-            return orders.Where(c => c.Side == Side.LAY).ToList();
-        }
-
         public static List<T> Copy<T>(this List<T> list)
         {
             List<T> newList = new List<T>();
@@ -84,6 +30,63 @@ namespace BetfairNG
                 newList.Add(list[i]);
 
             return newList;
+        }
+
+        public static double GetMarketEfficiency(IEnumerable<double> odds)
+        {
+            double total = odds.Sum(c => 1.0 / c);
+            return 1.0 / total;
+        }
+
+        public static MarketFilter HorseRaceFilter(string country = null)
+        {
+            var marketFilter = new MarketFilter
+            {
+                EventTypeIds = new HashSet<string>() { "7" },
+                MarketStartTime = new TimeRange()
+                {
+                    From = DateTime.Now,
+                    To = DateTime.Now.AddDays(1)
+                }
+            };
+            if (country != null)
+                marketFilter.MarketCountries = new HashSet<string>() { country };
+            marketFilter.MarketTypeCodes = new HashSet<string>() { "WIN" };
+
+            return marketFilter;
+        }
+
+        public static PriceProjection HorseRacePriceProjection()
+        {
+            ISet<PriceData> priceData = new HashSet<PriceData>
+            {
+                //get all prices from the exchange
+                PriceData.EX_TRADED,
+                PriceData.EX_ALL_OFFERS
+            };
+
+            var priceProjection = new PriceProjection
+            {
+                PriceData = priceData
+            };
+            return priceProjection;
+        }
+
+        public static ISet<MarketProjection> HorseRaceProjection()
+        {
+            ISet<MarketProjection> marketProjections = new HashSet<MarketProjection>
+            {
+                MarketProjection.RUNNER_METADATA,
+                MarketProjection.MARKET_DESCRIPTION,
+                MarketProjection.EVENT
+            };
+
+            return marketProjections;
+        }
+
+        public static List<Order> Lays(this List<Order> orders)
+        {
+            return orders.Where(c => c.Side == Side.LAY).ToList();
         }
 
         public static string MarketBookConsole(
@@ -122,7 +125,7 @@ namespace BetfairNG
             {
                 foreach (var runner in marketBook.Runners.Where(c => c.Status == RunnerStatus.ACTIVE))
                 {
-                    var runnerName = runnerDescriptions != null ? runnerDescriptions.FirstOrDefault(c => c.SelectionId == runner.SelectionId) : null;
+                    var runnerName = runnerDescriptions?.FirstOrDefault(c => c.SelectionId == runner.SelectionId);
                     var bsString = backSide != null ? backSide(runnerName, runner) : "";
                     var lyString = laySide != null ? laySide(runnerName, runner) : "";
 
@@ -176,9 +179,9 @@ namespace BetfairNG
 
             if (marketSnap.MarketRunners != null && marketSnap.MarketRunners.Count > 0)
             {
-                foreach (var runner in marketSnap.MarketRunners.Where(c => c.Definition.Status == BetfairNG.ESASwagger.Model.RunnerDefinition.StatusEnum.Active))
+                foreach (var runner in marketSnap.MarketRunners.Where(c => c.Definition.Status == Betfair.ESASwagger.Model.RunnerDefinition.StatusEnum.Active))
                 {
-                    var runnerName = runnerDescriptions != null ? runnerDescriptions.FirstOrDefault(c => c.SelectionId == runner.RunnerId.SelectionId) : null;
+                    var runnerName = runnerDescriptions?.FirstOrDefault(c => c.SelectionId == runner.RunnerId.SelectionId);
                     var bsString = backSide != null ? backSide(runnerName, runner) : "";
                     var lyString = laySide != null ? laySide(runnerName, runner) : "";
 
@@ -201,8 +204,6 @@ namespace BetfairNG
 
             return sb.ToString();
         }
-
-
 
         public static string ToStringRunnerName(IEnumerable<RunnerCatalog> descriptions, IEnumerable<Runner> runners)
         {
@@ -230,7 +231,7 @@ namespace BetfairNG
 
     public class PriceHelpers
     {
-        public static double[] Table = new double[] 
+        public static double[] Table = new double[]
         {
             1.01, 1.02, 1.03, 1.04, 1.05, 1.06, 1.07, 1.08, 1.09,
             1.1, 1.11, 1.12, 1.13, 1.14, 1.15, 1.16, 1.17, 1.18, 1.19, 1.2,
@@ -267,11 +268,6 @@ namespace BetfairNG
             930.0, 940.0, 950.0, 960.0, 970.0, 980.0, 990.0, 1000.0
         };
 
-        public static bool IsValidPrice(double price)
-        {
-            return Table.Contains(price);
-        }
-
         public static double AddPip(double price)
         {
             if (!IsValidPrice(price))
@@ -290,22 +286,22 @@ namespace BetfairNG
             return Table[index + num];
         }
 
-        public static double SubtractPip(double price)
+        public static double ApplySpread(double price, double percentage)
         {
             if (!IsValidPrice(price))
                 throw new ApplicationException("Invalid Price");
 
-            int index = Array.IndexOf<double>(Table, price);
-            return Table[--index];
+            double adjustedPrice = price * percentage;
+
+            if (percentage <= 1.0)
+                return RoundDownToNearestBetfairPrice(adjustedPrice);
+            else
+                return RoundUpToNearestBetfairPrice(adjustedPrice);
         }
 
-        public static double SubtractPip(double price, int num)
+        public static bool IsValidPrice(double price)
         {
-            if (!IsValidPrice(price))
-                throw new ApplicationException("Invalid Price");
-
-            int index = Array.IndexOf<double>(Table, price);
-            return Table[index - num];
+            return Table.Contains(price);
         }
 
         public static double RoundDownToNearestBetfairPrice(double price)
@@ -334,7 +330,7 @@ namespace BetfairNG
             for (int i = 0; i < Table.Length; i++)
             {
                 if (Table[i] > price)
-                    return Table[index++];
+                    return Table[++index];
 
                 index++;
             }
@@ -342,18 +338,40 @@ namespace BetfairNG
             return 0.0;
         }
 
-        public static double ApplySpread(double price, double percentage)
+        /// <summary>
+        /// Find the first value on the ladder greater than the price and snap to the next position below that value.
+        /// </summary>
+        /// <param name="price">The price to snap onto the ladder</param>
+        /// <returns>the price if is is on the ladder or the value closest on the ladder below the input price</returns>
+        public static double SnapToLadder(double price)
+        {
+            if (IsValidPrice(price)) return price;
+
+            for (var index = 1; index < Table.Length; index++)
+            {
+                if (Table[index] > price)
+                    return Table[index - 1];
+            }
+
+            return Table.Last();
+        }
+
+        public static double SubtractPip(double price)
         {
             if (!IsValidPrice(price))
                 throw new ApplicationException("Invalid Price");
 
-            double adjustedPrice = price * percentage;
-
-            if (percentage <= 1.0)
-                return RoundDownToNearestBetfairPrice(adjustedPrice);
-            else
-                return RoundUpToNearestBetfairPrice(adjustedPrice);
+            int index = Array.IndexOf<double>(Table, price);
+            return Table[--index];
         }
 
+        public static double SubtractPip(double price, int num)
+        {
+            if (!IsValidPrice(price))
+                throw new ApplicationException("Invalid Price");
+
+            int index = Array.IndexOf<double>(Table, price);
+            return Table[index - num];
+        }
     }
 }

@@ -1,39 +1,38 @@
-﻿using System;
-using System.Linq;
-using System.Threading.Tasks;
-using System.Reactive.Linq;
-using BetfairNG.Data;
-using System.Reactive.Disposables;
+﻿using BetfairNG.Data;
+using System;
 using System.Collections.Concurrent;
 using System.Diagnostics;
+using System.Linq;
+using System.Reactive.Disposables;
+using System.Reactive.Linq;
 using System.Threading;
+using System.Threading.Tasks;
 
 namespace BetfairNG
 {
     public class MarketListener
     {
-        private static MarketListener listener = null;
-        private int connectionCount;
-        private int samplePeriod;
-        private int sampleFrequency;
-        private bool marketAdded = false;
-        private PriceProjection priceProjection;        
-        private BetfairClient client;
         private static DateTime lastRequestStart;
-
-        private static DateTime latestDataRequestStart = DateTime.Now;
         private static DateTime latestDataRequestFinish = DateTime.Now;
+        private static DateTime latestDataRequestStart = DateTime.Now;
+        private static MarketListener listener = null;
+        private static readonly object lockObj = new object();
+        private readonly BetfairClient client;
+        private readonly int connectionCount;
+        private bool marketAdded = false;
 
-        private static object lockObj = new object();
-
-        private ConcurrentDictionary<string, IObservable<MarketBook>> markets =
+        private readonly ConcurrentDictionary<string, IObservable<MarketBook>> markets =
             new ConcurrentDictionary<string, IObservable<MarketBook>>();
 
-        private ConcurrentDictionary<string, IObserver<MarketBook>> observers =
+        private readonly ConcurrentDictionary<string, IObserver<MarketBook>> observers =
             new ConcurrentDictionary<string, IObserver<MarketBook>>();
 
-        private MarketListener(BetfairClient client, 
-            PriceProjection priceProjection, 
+        private readonly PriceProjection priceProjection;
+        private readonly int sampleFrequency;
+        private readonly int samplePeriod;
+
+        private MarketListener(BetfairClient client,
+            PriceProjection priceProjection,
             int connectionCount, int samplePeriod)
         {
             this.client = client;
@@ -47,14 +46,37 @@ namespace BetfairNG
             Task.Run(() => PollMarketBooks());
         }
 
-        public static MarketListener Create(BetfairClient client, 
-            PriceProjection priceProjection, 
+        public static MarketListener Create(BetfairClient client,
+            PriceProjection priceProjection,
             int connectionCount, int samplePeriod = 0)
         {
             if (listener == null)
                 listener = new MarketListener(client, priceProjection, connectionCount, samplePeriod);
 
             return listener;
+        }
+
+        public IObservable<MarketBook> SubscribeMarketBook(string marketId)
+        {
+            if (markets.TryGetValue(marketId, out IObservable<MarketBook> market))
+                return market;
+
+            var observable = Observable.Create<MarketBook>(
+                (IObserver<MarketBook> observer) =>
+                {
+                    observers.AddOrUpdate(marketId, observer, (key, existingVal) => existingVal);
+                    return Disposable.Create(() =>
+                    {
+                        markets.TryRemove(marketId, out IObservable<MarketBook> o);
+                        observers.TryRemove(marketId, out IObserver<MarketBook> ob);
+                    });
+                })
+                .Publish()
+                .RefCount();
+
+            markets.AddOrUpdate(marketId, observable, (key, existingVal) => existingVal);
+            marketAdded = true;
+            return observable;
         }
 
         public IObservable<Runner> SubscribeRunner(string marketId, long selectionId)
@@ -80,36 +102,10 @@ namespace BetfairNG
             return observable;
         }
 
-        public IObservable<MarketBook> SubscribeMarketBook(string marketId)
-        {
-            IObservable<MarketBook> market;
-            if (markets.TryGetValue(marketId, out market))
-                return market;
-
-            var observable = Observable.Create<MarketBook>(
-                (IObserver<MarketBook> observer) =>
-                {
-                    observers.AddOrUpdate(marketId, observer, (key, existingVal) => existingVal);
-                    return Disposable.Create(() =>
-                    {
-                        IObserver<MarketBook> ob;
-                        IObservable<MarketBook> o;
-                        markets.TryRemove(marketId, out o);
-                        observers.TryRemove(marketId, out ob);
-                    });
-                })
-                .Publish()
-                .RefCount();
-
-            markets.AddOrUpdate(marketId, observable, (key, existingVal) => existingVal);
-            marketAdded = true;
-            return observable;
-        }
-
-        // TODO:// replace this with the Rx scheduler 
+        // TODO:// replace this with the Rx scheduler
         private void PollMarketBooks()
         {
-            for (int i = 0; i < connectionCount;i++)
+            for (int i = 0; i < connectionCount; i++)
             {
                 Task.Run(async () =>
                     {
@@ -148,8 +144,7 @@ namespace BetfairNG
 
                                     foreach (var market in book.Response)
                                     {
-                                        IObserver<MarketBook> o;
-                                        if (observers.TryGetValue(market.MarketId, out o))
+                                        if (observers.TryGetValue(market.MarketId, out IObserver<MarketBook> o))
                                         {
                                             // check to see if the market is finished
                                             if (market.Status == MarketStatus.CLOSED ||

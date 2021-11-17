@@ -1,11 +1,7 @@
-﻿using System;
+﻿using Betfair.ESASwagger.Model;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using BetfairNG.ESASwagger.Model;
 
-namespace BetfairNG.ESAClient.Cache
+namespace Betfair.ESAClient.Cache
 {
     /// <summary>
     /// Thread safe atomic snapshot of a market.
@@ -16,8 +12,11 @@ namespace BetfairNG.ESAClient.Cache
     public class MarketSnap
     {
         public MarketDefinition MarketDefinition { get; internal set; }
+
         public string MarketId { get; internal set; }
+
         public IList<MarketRunnerSnap> MarketRunners { get; internal set; }
+
         public double TradedVolume { get; internal set; }
 
         public override string ToString()
@@ -25,7 +24,7 @@ namespace BetfairNG.ESAClient.Cache
             return "MarketSnap{" +
                 "MarketId=" + MarketId +
                 ", MarketDefinition=" + MarketDefinition +
-                ", MarketRunners=" + String.Join(", ", MarketRunners) +
+                ", MarketRunners=" + string.Join(", ", MarketRunners) +
                 ", TradedVolume=" + TradedVolume +
                 "}";
         }

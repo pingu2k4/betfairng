@@ -1,19 +1,15 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using System.Collections.Generic;
 
-namespace BetfairNG.ESAClient.Cache
+namespace Betfair.ESAClient.Cache
 {
     /// <summary>
     /// Immutable tuple of price, size
     /// </summary>
     public class PriceSize
     {
+        public static readonly IList<PriceSize> EmptyList = new PriceSize[0];
         private readonly double _price;
         private readonly double _size;
-        public static readonly IList<PriceSize> EmptyList = new PriceSize[0];
 
         public PriceSize(List<double?> priceSize)
         {

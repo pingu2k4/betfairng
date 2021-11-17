@@ -1,19 +1,23 @@
-﻿using BetfairNG.ESAClient.Cache;
-using BetfairNG.ESASwagger.Model;
+﻿using Betfair.ESASwagger.Model;
 using Newtonsoft.Json;
 using System;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
-using System.Linq;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using BetfairNG.ESAClient.Auth;
 
-namespace BetfairNG.ESAClient.Protocol
+namespace Betfair.ESAClient.Protocol
 {
+    public delegate void ConnectionStatusChangedEventHandler(object sender, ConnectionStatusEventArgs e);
+
+    public class ConnectionStatusEventArgs : EventArgs
+    {
+        public ConnectionStatus New { get; set; }
+
+        public ConnectionStatus Old { get; set; }
+    }
+
     /// <summary>
     /// This class implements the basic request / response handling of the protocol
     /// </summary>
@@ -22,34 +26,30 @@ namespace BetfairNG.ESAClient.Protocol
         public const string OPERATION = "op";
 
         public const string REQUEST_AUTHENTICATION = "authentication";
+        public const string REQUEST_HEARTBEAT = "heartbeat";
         public const string REQUEST_MARKET_SUBSCRIPTION = "marketSubscription";
         public const string REQUEST_ORDER_SUBSCRIPTION = "orderSubscription";
-        public const string REQUEST_HEARTBEAT = "heartbeat";
-
         public const string RESPONSE_CONNECTION = "connection";
-        public const string RESPONSE_STATUS = "status";
         public const string RESPONSE_MARKET_CHANGE_MESSAGE = "mcm";
         public const string RESPONSE_ORDER_CHANGE_MESSAGE = "ocm";
-
-        private int _nextId;
-        private TaskCompletionSource<ConnectionMessage> _connectionMessage = new TaskCompletionSource<ConnectionMessage>();
-        private ConcurrentDictionary<int, RequestResponse> _tasks = new ConcurrentDictionary<int, RequestResponse>();
-
-        //subscription handlers
-        private SubscriptionHandler<MarketSubscriptionMessage, ChangeMessage<MarketChange>, MarketChange> _marketSubscriptionHandler;
-        private SubscriptionHandler<OrderSubscriptionMessage, ChangeMessage<OrderMarketChange>, OrderMarketChange> _orderSubscriptionHandler;
-
-        private IChangeMessageHandler _changeHandler;
-        private Action<string> _sendLine;
-        private ConnectionStatus _status = ConnectionStatus.STOPPED;
-
-        public DateTime LastRequestTime { get; private set; }
-        public DateTime LastResponseTime { get; private set; }
+        public const string RESPONSE_STATUS = "status";
+        private readonly Action<string> _sendLine;
 
         /// <summary>
         /// Lock used to syncronize the send process.
         /// </summary>
-        private object _sendLock = new object();
+        private readonly object _sendLock = new();
+
+        private IChangeMessageHandler _changeHandler;
+        private TaskCompletionSource<ConnectionMessage> _connectionMessage = new();
+
+        //subscription handlers
+        private SubscriptionHandler<MarketSubscriptionMessage, ChangeMessage<MarketChange>, MarketChange> _marketSubscriptionHandler;
+
+        private int _nextId;
+        private SubscriptionHandler<OrderSubscriptionMessage, ChangeMessage<OrderMarketChange>, OrderMarketChange> _orderSubscriptionHandler;
+        private ConnectionStatus _status = ConnectionStatus.STOPPED;
+        private ConcurrentDictionary<int, RequestResponse> _tasks = new();
 
         public RequestResponseProcessor(Action<string> sendLine)
         {
@@ -59,70 +59,36 @@ namespace BetfairNG.ESAClient.Protocol
             LastResponseTime = DateTime.MinValue;
         }
 
-        public ConnectionStatus Status
+        public event ConnectionStatusChangedEventHandler ConnectionStatusChanged;
+
+        public IChangeMessageHandler ChangeHandler
         {
             get
             {
-                return _status;
+                return _changeHandler;
             }
             set
             {
-                if (value == _status)
+                if (_changeHandler == null)
                 {
-                    //no-op
-                    return;
+                    _changeHandler = new NullChangeHandler();
                 }
-                ConnectionStatusEventArgs args = new ConnectionStatusEventArgs() { Old = _status, New = value };
-                Trace.TraceInformation("ESAClient: Status changed {0} -> {1}", _status, value);
-                _status = value;
-
-                DispatchConnectionStatusChanged(args);
+                else
+                {
+                    _changeHandler = value;
+                }
             }
         }
 
-        private void DispatchConnectionStatusChanged(ConnectionStatusEventArgs args)
-        {
-            if(ConnectionStatusChanged != null)
-            {
-                ConnectionStatusChanged(this, args);
-            }
-        }
+        public DateTime LastRequestTime { get; private set; }
 
-        /// <summary>
-        /// Trace change messages but truncate to specified chars (0 is off).
-        /// </summary>
-        public int TraceChangeTruncation { get; set; }
-
-        private void Reset()
-        {
-            _connectionMessage.TrySetCanceled();
-            _connectionMessage = new TaskCompletionSource<ConnectionMessage>();
-            foreach (RequestResponse task in _tasks.Values)
-            {
-                task.Cancelled();
-            }
-            _tasks = new ConcurrentDictionary<int, RequestResponse>();
-        }
-
-        public void Disconnected()
-        {
-            Status = ConnectionStatus.DISCONNECTED;
-            Reset();
-        }
-
-        public void Stopped()
-        {
-            MarketSubscriptionHandler = null;
-            OrderSubscriptionHandler = null;
-            Status = ConnectionStatus.STOPPED;
-            Reset();
-        }
+        public DateTime LastResponseTime { get; private set; }
 
         public MarketSubscriptionMessage MarketResubscribeMessage
         {
             get
             {
-                if(MarketSubscriptionHandler != null)
+                if (MarketSubscriptionHandler != null)
                 {
                     MarketSubscriptionMessage resub = MarketSubscriptionHandler.SubscriptionMessage;
                     resub.InitialClk = MarketSubscriptionHandler.InitialClk;
@@ -130,6 +96,21 @@ namespace BetfairNG.ESAClient.Protocol
                     return resub;
                 }
                 return null;
+            }
+        }
+
+        public SubscriptionHandler<MarketSubscriptionMessage, ChangeMessage<MarketChange>, MarketChange> MarketSubscriptionHandler
+        {
+            get
+            {
+                return _marketSubscriptionHandler;
+            }
+
+            set
+            {
+                if (_marketSubscriptionHandler != null) _marketSubscriptionHandler.Cancel();
+                _marketSubscriptionHandler = value;
+                if (value != null) Status = ConnectionStatus.SUBSCRIBED;
             }
         }
 
@@ -148,40 +129,6 @@ namespace BetfairNG.ESAClient.Protocol
             }
         }
 
-
-        public IChangeMessageHandler ChangeHandler
-        {
-            get
-            {
-                return _changeHandler;
-            }
-            set
-            {
-                if (_changeHandler == null)
-                {
-                    _changeHandler = new NullChangeHandler();
-                } else
-                {
-                    _changeHandler = value;
-                }
-            }
-        }
-
-        public SubscriptionHandler<MarketSubscriptionMessage, ChangeMessage<MarketChange>, MarketChange> MarketSubscriptionHandler
-        {
-            get
-            {
-                return _marketSubscriptionHandler;
-            }
-
-            set
-            {
-                if (_marketSubscriptionHandler != null) _marketSubscriptionHandler.Cancel();
-                _marketSubscriptionHandler = value;
-                if(value != null) Status = ConnectionStatus.SUBSCRIBED;              
-            }
-        }
-
         public SubscriptionHandler<OrderSubscriptionMessage, ChangeMessage<OrderMarketChange>, OrderMarketChange> OrderSubscriptionHandler
         {
             get
@@ -197,17 +144,49 @@ namespace BetfairNG.ESAClient.Protocol
             }
         }
 
-        public Task<ConnectionMessage> ConnectionMessage()
+        public ConnectionStatus Status
         {
-            return _connectionMessage.Task;
+            get
+            {
+                return _status;
+            }
+            set
+            {
+                if (value == _status)
+                {
+                    //no-op
+                    return;
+                }
+                ConnectionStatusEventArgs args = new() { Old = _status, New = value };
+                Trace.TraceInformation("ESAClient: Status changed {0} -> {1}", _status, value);
+                _status = value;
+
+                DispatchConnectionStatusChanged(args);
+            }
         }
+
+        /// <summary>
+        /// Trace change messages but truncate to specified chars (0 is off).
+        /// </summary>
+        public int TraceChangeTruncation { get; set; }
 
         public Task<StatusMessage> Authenticate(AuthenticationMessage message)
         {
             message.Id = NextId();
             message.Op = REQUEST_AUTHENTICATION;
-            return SendMessage(new RequestResponse((int)message.Id, message, 
+            return SendMessage(new RequestResponse((int)message.Id, message,
                 success => Status = ConnectionStatus.AUTHENTICATED));
+        }
+
+        public Task<ConnectionMessage> ConnectionMessage()
+        {
+            return _connectionMessage.Task;
+        }
+
+        public void Disconnected()
+        {
+            Status = ConnectionStatus.DISCONNECTED;
+            Reset();
         }
 
         public Task<StatusMessage> Heartbeat(HeartbeatMessage message)
@@ -233,36 +212,14 @@ namespace BetfairNG.ESAClient.Protocol
             message.Id = id;
             message.Op = REQUEST_ORDER_SUBSCRIPTION;
             var newSub = new SubscriptionHandler<OrderSubscriptionMessage, ChangeMessage<OrderMarketChange>, OrderMarketChange>(id, message, false);
-            return SendMessage(new RequestResponse(id, message, 
+            return SendMessage(new RequestResponse(id, message,
                 success => OrderSubscriptionHandler = newSub));
         }
 
-        private int NextId()
+        public void ProcessUncorrelatedStatus(StatusMessage statusMessage)
         {
-            int id = Interlocked.Increment(ref _nextId);
-            return id;
-        }
-
-
-        private Task<StatusMessage> SendMessage(RequestResponse requestResponse)
-        {
-            lock (_sendLock)
-            {
-                //store a future task
-                _tasks[requestResponse.Id] = requestResponse;
-
-                //serialize message & send
-                string line = JsonConvert.SerializeObject(requestResponse.Request, Formatting.None);
-                Trace.TraceInformation("Client->ESA: " + line);
-
-                //send line
-                _sendLine(line);
-
-                //time
-                LastRequestTime = DateTime.UtcNow;
-            }
-
-            return requestResponse.Task;
+            Trace.TraceError("Error Status Notification: {0}", statusMessage);
+            ChangeHandler.OnErrorStatusNotification(statusMessage);
         }
 
         /// <summary>
@@ -285,24 +242,28 @@ namespace BetfairNG.ESAClient.Protocol
                     message = connectionMessage;
                     ProcessConnectionMessage(connectionMessage);
                     break;
+
                 case RESPONSE_STATUS:
                     Trace.TraceInformation("ESA->Client: {0}", line);
                     StatusMessage statusMessage = ReadResponseMessage<StatusMessage>(line);
                     message = statusMessage;
                     ProcessStatusMessage(statusMessage);
                     break;
+
                 case RESPONSE_MARKET_CHANGE_MESSAGE:
                     TraceChange(line);
                     MarketChangeMessage marketChangeMessage = ReadResponseMessage<MarketChangeMessage>(line);
                     message = marketChangeMessage;
                     ProcessMarketChangeMessage(marketChangeMessage);
                     break;
+
                 case RESPONSE_ORDER_CHANGE_MESSAGE:
                     TraceChange(line);
                     OrderChangeMessage orderChangeMessage = ReadResponseMessage<OrderChangeMessage>(line);
                     message = orderChangeMessage;
                     ProcessOrderChangeMessage(orderChangeMessage);
                     break;
+
                 default:
                     Trace.TraceError("ESA->Client: Unknown message type: {0}, message:{1}", operation, line);
                     break;
@@ -312,68 +273,12 @@ namespace BetfairNG.ESAClient.Protocol
             return message;
         }
 
-        private void TraceChange(string line)
+        public void Stopped()
         {
-            if (TraceChangeTruncation != 0)
-            {
-                Trace.TraceInformation("ESA->Client: {0}", line.Substring(0, Math.Min(TraceChangeTruncation, line.Length)));
-            }              
-        }
-
-        private void ProcessOrderChangeMessage(OrderChangeMessage message)
-        {
-            ChangeMessage<OrderMarketChange> change = ChangeMessageFactory.ToChangeMessage(message);
-            change = OrderSubscriptionHandler.ProcessChangeMessage(change);
-
-            if (change != null) ChangeHandler.OnOrderChange(change);
-        }
-
-        private void ProcessMarketChangeMessage(MarketChangeMessage message)
-        {
-            ChangeMessage<MarketChange> change = ChangeMessageFactory.ToChangeMessage(message);
-            change = MarketSubscriptionHandler.ProcessChangeMessage(change);
-
-            if(change != null) ChangeHandler.OnMarketChange(change);
-        }
-
-        private void ProcessStatusMessage(StatusMessage statusMessage)
-        {
-
-            if (statusMessage.Id == null)
-            {
-                //async status / status for a message that couldn't be decoded
-                ProcessUncorrelatedStatus(statusMessage);
-            } else {
-                RequestResponse task;
-                _tasks.TryGetValue((int)statusMessage.Id, out task);
-                if(task == null)
-                {
-                    //shouldn't happen
-                    ProcessUncorrelatedStatus(statusMessage);
-                } else
-                {
-                    //unwind task
-                    task.ProcesStatusMessage(statusMessage);
-                }
-            }
-        }
-
-        public void ProcessUncorrelatedStatus(StatusMessage statusMessage)
-        {
-            Trace.TraceError("Error Status Notification: {0}", statusMessage);
-            ChangeHandler.OnErrorStatusNotification(statusMessage);
-        }
-
-        protected void ProcessConnectionMessage(ConnectionMessage connectionMessage)
-        {
-            _connectionMessage.TrySetResult(connectionMessage);
-            Status = ConnectionStatus.CONNECTED;
-        }
-
-        private T ReadResponseMessage<T>(string line) where T : ResponseMessage
-        {
-            T response = JsonConvert.DeserializeObject<T>(line);
-            return response;
+            MarketSubscriptionHandler = null;
+            OrderSubscriptionHandler = null;
+            Status = ConnectionStatus.STOPPED;
+            Reset();
         }
 
         /// <summary>
@@ -406,8 +311,115 @@ namespace BetfairNG.ESAClient.Protocol
             return operation;
         }
 
+        protected void ProcessConnectionMessage(ConnectionMessage connectionMessage)
+        {
+            _connectionMessage.TrySetResult(connectionMessage);
+            Status = ConnectionStatus.CONNECTED;
+        }
+
+        private void DispatchConnectionStatusChanged(ConnectionStatusEventArgs args)
+        {
+            ConnectionStatusChanged?.Invoke(this, args);
+        }
+
+        private int NextId()
+        {
+            int id = Interlocked.Increment(ref _nextId);
+            return id;
+        }
+
+        private void ProcessMarketChangeMessage(MarketChangeMessage message)
+        {
+            ChangeMessage<MarketChange> change = ChangeMessageFactory.ToChangeMessage(message);
+            change = MarketSubscriptionHandler.ProcessChangeMessage(change);
+
+            if (change != null) ChangeHandler.OnMarketChange(change);
+        }
+
+        private void ProcessOrderChangeMessage(OrderChangeMessage message)
+        {
+            ChangeMessage<OrderMarketChange> change = ChangeMessageFactory.ToChangeMessage(message);
+            change = OrderSubscriptionHandler.ProcessChangeMessage(change);
+
+            if (change != null) ChangeHandler.OnOrderChange(change);
+        }
+
+        private void ProcessStatusMessage(StatusMessage statusMessage)
+        {
+            if (statusMessage.Id == null)
+            {
+                //async status / status for a message that couldn't be decoded
+                ProcessUncorrelatedStatus(statusMessage);
+            }
+            else
+            {
+                _tasks.TryGetValue((int)statusMessage.Id, out RequestResponse task);
+                if (task == null)
+                {
+                    //shouldn't happen
+                    ProcessUncorrelatedStatus(statusMessage);
+                }
+                else
+                {
+                    //unwind task
+                    task.ProcesStatusMessage(statusMessage);
+                }
+            }
+        }
+
+        private T ReadResponseMessage<T>(string line) where T : ResponseMessage
+        {
+            T response = JsonConvert.DeserializeObject<T>(line);
+            return response;
+        }
+
+        private void Reset()
+        {
+            _connectionMessage.TrySetCanceled();
+            _connectionMessage = new TaskCompletionSource<ConnectionMessage>();
+            foreach (RequestResponse task in _tasks.Values)
+            {
+                task.Cancelled();
+            }
+            _tasks = new ConcurrentDictionary<int, RequestResponse>();
+        }
+
+        private Task<StatusMessage> SendMessage(RequestResponse requestResponse)
+        {
+            lock (_sendLock)
+            {
+                //store a future task
+                _tasks[requestResponse.Id] = requestResponse;
+
+                //serialize message & send
+                string line = JsonConvert.SerializeObject(requestResponse.Request, Formatting.None);
+                Trace.TraceInformation("Client->ESA: " + line);
+
+                //send line
+                _sendLine(line);
+
+                //time
+                LastRequestTime = DateTime.UtcNow;
+            }
+
+            return requestResponse.Task;
+        }
+
+        private void TraceChange(string line)
+        {
+            if (TraceChangeTruncation != 0)
+            {
+                Trace.TraceInformation("ESA->Client: {0}", line[..Math.Min(TraceChangeTruncation, line.Length)]);
+            }
+        }
+
         private class NullChangeHandler : IChangeMessageHandler
         {
+            public void OnErrorStatusNotification(StatusMessage message)
+            {
+                Console.WriteLine("<null change handler>.OnErrorStatusNotification: " + message);
+            }
+
             public void OnMarketChange(ChangeMessage<MarketChange> change)
             {
                 Console.WriteLine("<null change handler>.OnMarketChange: " + change);
@@ -417,21 +429,6 @@ namespace BetfairNG.ESAClient.Protocol
             {
                 Console.WriteLine("<null change handler>.OnOrderChange: " + change);
             }
-
-            public void OnErrorStatusNotification(StatusMessage message)
-            {
-                Console.WriteLine("<null change handler>.OnErrorStatusNotification: " + message);
-            }
         }
-
-        public event ConnectionStatusChangedEventHandler ConnectionStatusChanged;
-    }
-
-    public delegate void ConnectionStatusChangedEventHandler(object sender, ConnectionStatusEventArgs e);
-
-    public class ConnectionStatusEventArgs : EventArgs
-    {
-        public ConnectionStatus Old { get; set; }
-        public ConnectionStatus New { get; set; }
     }
 }

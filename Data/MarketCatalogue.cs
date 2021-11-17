@@ -1,13 +1,27 @@
+using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Text;
-using Newtonsoft.Json;
 
 namespace BetfairNG.Data
 {
     public class MarketCatalogue
     {
+        [JsonProperty(PropertyName = "competition")]
+        public Competition Competition { get; set; }
+
+        [JsonProperty(PropertyName = "description")]
+        public MarketDescription Description { get; set; }
+
+        [JsonProperty(PropertyName = "event")]
+        public Event Event { get; set; }
+
+        [JsonProperty(PropertyName = "eventType")]
+        public EventType EventType { get; set; }
+
+        [JsonProperty(PropertyName = "isMarketDataDelayed")]
+        public bool IsMarketDataDelayed { get; set; }
+
         [JsonProperty(PropertyName = "marketId")]
         public string MarketId { get; set; }
 
@@ -17,26 +31,11 @@ namespace BetfairNG.Data
         [JsonProperty(PropertyName = "marketStartTime")]
         public DateTime MarketStartTime { get; set; }
 
-        [JsonProperty(PropertyName = "isMarketDataDelayed")]
-        public bool IsMarketDataDelayed { get; set; }
-
-        [JsonProperty(PropertyName = "description")]
-        public MarketDescription Description { get; set; }
-
-        [JsonProperty(PropertyName = "totalMatched")]
-        public double TotalMatched { get; set; }
-        
         [JsonProperty(PropertyName = "runners")]
         public List<RunnerCatalog> Runners { get; set; }
 
-        [JsonProperty(PropertyName = "eventType")]
-        public EventType EventType { get; set; }
-
-        [JsonProperty(PropertyName = "competition")]
-        public Competition Competition { get; set; }
-
-        [JsonProperty(PropertyName = "event")]
-        public Event Event { get; set; }
+        [JsonProperty(PropertyName = "totalMatched")]
+        public double TotalMatched { get; set; }
 
         public override string ToString()
         {

@@ -1,27 +1,25 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using Newtonsoft.Json;
+using System.Collections.Generic;
+using System.Text;
 
 namespace BetfairNG.Data
 {
     public class PlaceExecutionReport
     {
-        [JsonProperty(PropertyName = "status")]
-        public ExecutionReportStatus Status { get; set; }
+        [JsonProperty(PropertyName = "customerRef")]
+        public string CustomerRef { get; set; }
 
         [JsonProperty(PropertyName = "errorCode")]
         public ExecutionReportErrorCode ErrorCode { get; set; }
 
-        [JsonProperty(PropertyName = "marketId")]
-        public string MarketId { get; set; }
-
         [JsonProperty(PropertyName = "instructionReports")]
         public IList<PlaceInstructionReport> InstructionReports { get; set; }
 
-        [JsonProperty(PropertyName = "customerRef")]
-        public string CustomerRef { get; set; }
+        [JsonProperty(PropertyName = "marketId")]
+        public string MarketId { get; set; }
+
+        [JsonProperty(PropertyName = "status")]
+        public ExecutionReportStatus Status { get; set; }
 
         public override string ToString()
         {

@@ -1,30 +1,28 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using Newtonsoft.Json;
+using System;
+using System.Text;
 
 namespace BetfairNG.Data
 {
     public class Event
     {
+        [JsonProperty(PropertyName = "countryCode")]
+        public string CountryCode { get; set; }
+
         [JsonProperty(PropertyName = "id")]
         public string Id { get; set; }
 
         [JsonProperty(PropertyName = "name")]
         public string Name { get; set; }
 
-        [JsonProperty(PropertyName = "countryCode")]
-        public string CountryCode { get; set; }
+        [JsonProperty(PropertyName = "openDate")]
+        public DateTime? OpenDate { get; set; }
 
         [JsonProperty(PropertyName = "timezone")]
         public string Timezone { get; set; }
 
         [JsonProperty(PropertyName = "venue")]
         public string Venue { get; set; }
-
-        [JsonProperty(PropertyName = "openDate")]
-        public DateTime? OpenDate { get; set; }
 
         public override string ToString()
         {
