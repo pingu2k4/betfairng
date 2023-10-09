@@ -353,7 +353,7 @@ namespace BetfairNG
             return networkClient.Invoke<List<VenueResult>>(Endpoint.Betting, LIST_VENUES, args);
         }
 
-        public bool Login(string p12CertificateLocation,
+        public Task<LoginResult> Login(string p12CertificateLocation,
                                                                                                                                                                     string username,
             string password,
             string loginUrl = "https://identitysso-cert.betfair.com/api/certlogin")
@@ -370,7 +370,7 @@ namespace BetfairNG
             return Login(x509certificate, postData, loginUrl);
         }
 
-        public bool Login(string p12CertificateLocation,
+        public Task<LoginResult> Login(string p12CertificateLocation,
             string p12CertificatePassword,
             string username, string password,
             string loginUrl = "https://identitysso-cert.betfair.com/api/certlogin")
@@ -389,7 +389,7 @@ namespace BetfairNG
             return Login(x509certificate, postData, loginUrl);
         }
 
-        public bool Login(X509Certificate2 p12Certificate,
+        public Task<LoginResult> Login(X509Certificate2 p12Certificate,
             string username,
             string password,
             string loginUrl = "https://identitysso-cert.betfair.com/api/certlogin")
@@ -468,7 +468,7 @@ namespace BetfairNG
             return networkClient.Invoke<UpdateExecutionReport>(Endpoint.Betting, UPDATE_ORDERS_METHOD, args);
         }
 
-        private bool Login(X509Certificate2 x509certificate, string postData, string loginUrl)
+        private async Task<LoginResult> Login(X509Certificate2 x509certificate, string postData, string loginUrl)
         {
             HttpWebRequest request = (HttpWebRequest)WebRequest.Create(loginUrl);
             request.UseDefaultCredentials = true;
@@ -480,25 +480,34 @@ namespace BetfairNG
             if (this.proxy != null)
                 request.Proxy = this.proxy;
 
-            using (Stream stream = request.GetRequestStream())
+            using (Stream stream = await request.GetRequestStreamAsync())
             using (StreamWriter writer = new StreamWriter(stream, Encoding.Default))
             {
-                writer.Write(postData);
+                await writer.WriteAsync(postData);
             }
 
-            using (Stream stream = ((HttpWebResponse)request.GetResponse()).GetResponseStream())
+            using (Stream stream = ((HttpWebResponse)await request.GetResponseAsync()).GetResponseStream())
             using (StreamReader reader = new StreamReader(stream, Encoding.Default))
             {
-                var jsonResponse = JsonConvert.Deserialize<LoginResponse>(reader.ReadToEnd());
+                var content = await reader.ReadToEndAsync();
+                var jsonResponse = JsonConvert.Deserialize<LoginResponse>(content);
                 if (jsonResponse.LoginStatus == "SUCCESS")
                 {
                     this.sessionToken = jsonResponse.SessionToken;
                     this.networkClient = new Network(appKey, this.sessionToken, this.preNetworkRequest);
 
-                    return true;
+                    return new LoginResult
+                    {
+                        LoggedIn = true,
+                        LoginStatus = jsonResponse.LoginStatus,
+                    };
                 }
                 else
-                    return false;
+                    return new LoginResult
+                    {
+                        LoggedIn = false,
+                        LoginStatus = jsonResponse.LoginStatus,
+                    };
             }
         }
     }
@@ -560,5 +569,11 @@ namespace BetfairNG
 
         [JsonProperty(PropertyName = "sessionToken")]
         public string SessionToken { get; set; }
+    }
+
+    public class LoginResult
+    {
+        public string LoginStatus { get; set; }
+        public bool LoggedIn { get; set; }
     }
 }

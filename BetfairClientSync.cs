@@ -204,26 +204,26 @@ namespace BetfairNG
             return client.ListVenues(marketFilter).Result;
         }
 
-        public bool Login(string p12CertificateLocation,
+        public LoginResult Login(string p12CertificateLocation,
                                                                                                                                                                 string username,
         string password,
         string loginURL = "https://identitysso-cert.betfair.com/api/certlogin")
         {
-            return client.Login(p12CertificateLocation, username, password, loginURL);
+            return client.Login(p12CertificateLocation, username, password, loginURL).Result;
         }
 
-        public bool Login(string p12CertificateLocation,
+        public LoginResult Login(string p12CertificateLocation,
             string p12CertificatePassword,
             string username,
             string password,
             string loginUrl = "https://identitysso-cert.betfair.com/api/certlogin")
         {
-            return client.Login(p12CertificateLocation, p12CertificatePassword, username, password, loginUrl);
+            return client.Login(p12CertificateLocation, p12CertificatePassword, username, password, loginUrl).Result;
         }
 
-        public bool Login(X509Certificate2 p12Certificate, string username, string password)
+        public LoginResult Login(X509Certificate2 p12Certificate, string username, string password)
         {
-            return client.Login(p12Certificate, username, password);
+            return client.Login(p12Certificate, username, password).Result;
         }
 
         public BetfairServerResponse<PlaceExecutionReport> PlaceOrders(
